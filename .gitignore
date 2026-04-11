@@ -1,0 +1,15 @@
+
+.env
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Database
+chroma_db/
+
+# Chat history
+chat_history/
+
+# Environment
+.env

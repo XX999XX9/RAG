@@ -1,0 +1,14 @@
+# 核心依赖
+streamlit
+langchain-core
+langchain-community
+langchain-chroma
+chromadb
+dashscope
+
+# 文件解析依赖
+PyPDF2
+python-docx
+
+# 环境配置
+python-dotenv
