@@ -52,63 +52,24 @@ class VectorStoreService(object):
             except Exception as e:
                 logger.warning(f"Ollama 重排序器初始化失败，将跳过重排序: {str(e)}")
 
-    def _expand_with_neighbors(self, docs, top_n=2):
+    def fetch_chunk_by_index(self, source: str, chunk_index: int):
         """
-        为检索结果中排名靠前的文档补充物理上相邻的 chunk
-        top_n: 对前 top_n 个结果进行邻近扩展
+        根据 source 和 chunk_index 精确获取某个 chunk
+        用于 LLM 驱动的邻近 chunk 扩展
         """
-        if not docs:
-            return docs
-        
-        expanded = []
-        seen_ids = set()
-        
-        for i, doc in enumerate(docs):
-            doc_id = f"{doc.page_content[:100]}-{doc.metadata.get('source', '')}-{doc.metadata.get('chunk_index', '')}"
-            if doc_id not in seen_ids:
-                seen_ids.add(doc_id)
-                expanded.append(doc)
-            
-            if i >= top_n:
-                continue
-            
-            source = doc.metadata.get('source', '')
-            chunk_index = doc.metadata.get('chunk_index', None)
-            title = doc.metadata.get('title', '')
-            
-            if chunk_index is None or not source:
-                continue
-            
-            for offset in [-1, 1]:
-                neighbor_index = chunk_index + offset
-                if neighbor_index < 0:
-                    continue
-                
-                neighbor_filter = {
-                    '$and': [
-                        {'source': source},
-                        {'chunk_index': neighbor_index}
-                    ]
-                }
-                
-                try:
-                    neighbor_results = self.vector_store.similarity_search(
-                        '', k=1, filter=neighbor_filter
-                    )
-                    if neighbor_results:
-                        neighbor = neighbor_results[0]
-                        neighbor_id = f"{neighbor.page_content[:100]}-{neighbor.metadata.get('source', '')}-{neighbor.metadata.get('chunk_index', '')}"
-                        if neighbor_id not in seen_ids:
-                            seen_ids.add(neighbor_id)
-                            neighbor.metadata['is_neighbor'] = True
-                            neighbor.metadata['neighbor_of'] = chunk_index
-                            expanded.append(neighbor)
-                            logger.debug(f"补充邻近 chunk: source={source}, chunk_index={neighbor_index}")
-                except Exception as e:
-                    logger.warning(f"查询邻近 chunk 失败: source={source}, chunk_index={neighbor_index}, error={str(e)}")
-        
-        logger.info(f"邻近扩展完成: 原始 {len(docs)} 个 -> 扩展后 {len(expanded)} 个")
-        return expanded
+        try:
+            results = self.vector_store.similarity_search(
+                '', k=1,
+                filter={'$and': [{'source': source}, {'chunk_index': chunk_index}]}
+            )
+            if results:
+                logger.info(f"获取邻近 chunk 成功: source={source}, chunk_index={chunk_index}")
+            else:
+                logger.info(f"邻近 chunk 不存在: source={source}, chunk_index={chunk_index}")
+            return results
+        except Exception as e:
+            logger.warning(f"获取邻近 chunk 失败: source={source}, chunk_index={chunk_index}, error={str(e)}")
+            return []
 
     def get_retriever(self):
         """返回纯向量检索器，项目中没有被使用，作为后续开发备用"""
@@ -145,8 +106,6 @@ class VectorStoreService(object):
             if self.reranker and merged_results:
                 merged_results = self.reranker.rerank(query, merged_results, top_k=k)
                 logger.info(f"Ollama 重排序完成")
-            
-            merged_results = self._expand_with_neighbors(merged_results, top_n=config.NEIGHBOR_EXPAND_TOP_N)
             
             return merged_results
         except Exception as e:
@@ -208,8 +167,6 @@ class VectorStoreService(object):
                     merged.append(doc)
             
             logger.info(f"分源检索合并结果数量: {len(merged)} (参考: {len(reference_results)}, 全局: {len(global_results)})")
-            
-            merged = self._expand_with_neighbors(merged, top_n=config.NEIGHBOR_EXPAND_TOP_N)
             
             return merged
         except Exception as e:

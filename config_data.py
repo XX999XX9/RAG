@@ -68,8 +68,9 @@ REFERENCE_KEYWORDS = ['参考', '依据', '引用', '根据', '出自', '来源'
 #向量库中返回的检索结果数量
 retrieve_top_k = 10
 
-# 邻近 chunk 扩展配置
-NEIGHBOR_EXPAND_TOP_N = 2  # 对检索结果中前 N 个进行邻近 chunk 扩展
+# 邻近 chunk 扩展配置（LLM驱动）
+USE_LLM_CHUNK_EXPANSION = True  # 启用 LLM 驱动的邻近 chunk 扩展
+LLM_CHUNK_EXPANSION_MAX_ITERATIONS = 2  # LLM 判断完整性的最大迭代次数
 
 #嵌入模型名称
 embedding_model_name = 'text-embedding-v4'

@@ -166,6 +166,123 @@ def extract_book_title(text: str) -> str:
     return None
 
 
+def _expand_chunks_with_llm(docs, vector_service, chat_model, max_iterations=None):
+    """
+    使用 LLM 迭代判断检索结果中的 chunk 是否完整，
+    如果不完整则获取物理上相邻的文本块，直到 LLM 认为参考资料已经完整。
+    
+    流程：
+    1. 将当前 chunk 列表提交给 LLM
+    2. LLM 判断哪些 chunk 在开头/结尾被截断，返回需要扩展的方向
+    3. 系统根据 LLM 的指示获取邻近 chunk
+    4. 重复步骤1-3，直到 LLM 判断所有资料完整或达到最大迭代次数
+    """
+    if max_iterations is None:
+        max_iterations = config.LLM_CHUNK_EXPANSION_MAX_ITERATIONS
+    
+    if not docs:
+        return docs
+    
+    current_docs = list(docs)
+    
+    for iteration in range(max_iterations):
+        chunks_text = ""
+        for i, doc in enumerate(current_docs):
+            source = doc.metadata.get('source', '未知')
+            chunk_index = doc.metadata.get('chunk_index', '无')
+            title = doc.metadata.get('title', '未知')
+            content_preview = doc.page_content
+            chunks_text += f"[资料{i+1}] 来源: {source} | 文献: {title} | chunk_index: {chunk_index}\n内容: {content_preview}\n\n"
+        
+        judge_prompt = f"""请判断以下参考资料中，哪些在开头或结尾处被截断（内容不完整），需要获取物理上相邻的文本块来补全。
+
+判断标准：
+- 如果一段内容的开头没有完整的主语或上下文衔接，说明开头被截断，需要获取上一个chunk（prev）
+- 如果一段内容的结尾语义未完结（如句子未结束、论述未完成），说明结尾被截断，需要获取下一个chunk（next）
+- 如果两端都被截断，需要同时获取（both）
+- 如果内容语义完整，不需要扩展
+
+请严格以JSON格式返回，不要包含任何其他内容：
+{{"expansions": [{{"index": 0, "direction": "next"}}]}}
+
+index从0开始，direction为prev/next/both之一。
+如果所有资料都完整，返回：{{"expansions": []}}
+
+参考资料：
+{chunks_text}"""
+        
+        try:
+            response = chat_model.invoke(judge_prompt)
+            response_text = response.content.strip()
+            
+            json_match = re.search(r'\{[\s\S]*\}', response_text)
+            if not json_match:
+                logger.warning(f"LLM完整性判断返回格式错误（迭代{iteration+1}），跳过扩展")
+                break
+            
+            result = json.loads(json_match.group())
+            expansions = result.get('expansions', [])
+        except Exception as e:
+            logger.warning(f"LLM完整性判断失败（迭代{iteration+1}）: {str(e)}，跳过扩展")
+            break
+        
+        if not expansions:
+            logger.info(f"LLM判断所有资料完整，共迭代{iteration+1}次")
+            break
+        
+        seen_ids = set()
+        for doc in current_docs:
+            doc_id = f"{doc.page_content[:100]}-{doc.metadata.get('source', '')}-{doc.metadata.get('chunk_index', '')}"
+            seen_ids.add(doc_id)
+        
+        new_docs = []
+        for expansion in expansions:
+            idx = expansion.get('index', -1)
+            direction = expansion.get('direction', 'next')
+            
+            if idx < 0 or idx >= len(current_docs):
+                continue
+            
+            doc = current_docs[idx]
+            source = doc.metadata.get('source', '')
+            chunk_index = doc.metadata.get('chunk_index', None)
+            
+            if chunk_index is None or not source:
+                continue
+            
+            offsets = []
+            if direction in ('prev', 'both'):
+                offsets.append(-1)
+            if direction in ('next', 'both'):
+                offsets.append(1)
+            
+            for offset in offsets:
+                neighbor_index = chunk_index + offset
+                if neighbor_index < 0:
+                    continue
+                
+                neighbor_list = vector_service.fetch_chunk_by_index(source, neighbor_index)
+                for neighbor in neighbor_list:
+                    neighbor_id = f"{neighbor.page_content[:100]}-{neighbor.metadata.get('source', '')}-{neighbor.metadata.get('chunk_index', '')}"
+                    if neighbor_id not in seen_ids:
+                        seen_ids.add(neighbor_id)
+                        neighbor.metadata['is_neighbor'] = True
+                        neighbor.metadata['neighbor_of'] = chunk_index
+                        neighbor.metadata['match_type'] = doc.metadata.get('match_type', 'semantic')
+                        new_docs.append(neighbor)
+        
+        if not new_docs:
+            logger.info(f"没有可扩展的邻近chunk，共迭代{iteration+1}次")
+            break
+        
+        current_docs = current_docs + new_docs
+        logger.info(f"LLM驱动扩展: 第{iteration+1}次迭代，新增{len(new_docs)}个chunk，当前共{len(current_docs)}个")
+    else:
+        logger.info(f"达到最大迭代次数{max_iterations}，停止扩展")
+    
+    return current_docs
+
+
 def _merge_neighbor_chunks(docs):
     """
     将邻近 chunk 与原始 chunk 合并：
@@ -360,6 +477,10 @@ class RagService(object):
                 )
             else:
                 results = self.vector_service.hybrid_retrieve(query, keywords)
+            
+            if config.USE_LLM_CHUNK_EXPANSION:
+                results = _expand_chunks_with_llm(results, self.vector_service, self.chat_model)
+            
             return results
 
         def format_for_prompt_template(value: dict):
