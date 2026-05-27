@@ -166,6 +166,67 @@ def extract_book_title(text: str) -> str:
     return None
 
 
+def _merge_neighbor_chunks(docs):
+    """
+    将邻近 chunk 与原始 chunk 合并：
+    按 source 分组，在每组内按 chunk_index 排序，
+    将物理上连续的 chunk 拼接为一个完整的文档
+    """
+    from langchain_core.documents import Document
+    
+    if not docs:
+        return docs
+    
+    # 按 source 分组
+    source_groups = {}
+    for doc in docs:
+        source = doc.metadata.get('source', '')
+        if source not in source_groups:
+            source_groups[source] = []
+        source_groups[source].append(doc)
+    
+    merged_docs = []
+    
+    for source, group_docs in source_groups.items():
+        # 按 chunk_index 排序
+        sorted_docs = sorted(group_docs, key=lambda d: d.metadata.get('chunk_index', 0))
+        
+        # 将连续的 chunk 拼接
+        current_doc = None
+        current_end_index = None
+        
+        for doc in sorted_docs:
+            chunk_index = doc.metadata.get('chunk_index', None)
+            
+            if current_doc is None:
+                current_doc = doc
+                current_end_index = chunk_index
+            elif chunk_index is not None and chunk_index == current_end_index + 1:
+                # 物理上连续，拼接内容
+                current_doc.page_content += "\n" + doc.page_content
+                current_end_index = chunk_index
+                # 保留最后一个 chunk 的 chapter 信息（如果更详细）
+                if doc.metadata.get('chapter') and not current_doc.metadata.get('chapter'):
+                    current_doc.metadata['chapter'] = doc.metadata['chapter']
+                    current_doc.metadata['chapter_number'] = doc.metadata.get('chapter_number')
+            else:
+                # 不连续，保存当前文档，开始新的
+                merged_docs.append(current_doc)
+                current_doc = doc
+                current_end_index = chunk_index
+        
+        if current_doc is not None:
+            merged_docs.append(current_doc)
+    
+    # 清理邻居标记
+    for doc in merged_docs:
+        doc.metadata.pop('is_neighbor', None)
+        doc.metadata.pop('neighbor_of', None)
+    
+    logger.info(f"邻近 chunk 合并: {len(docs)} 个 -> {len(merged_docs)} 个")
+    return merged_docs
+
+
 class RagService(object):
     def __init__(self):
         try:
@@ -219,11 +280,14 @@ class RagService(object):
                 logger.info("检索到的参考资料数量: 0")
                 return '无相关参考资料'
             
-            has_reference = any(doc.metadata.get('match_type') == 'reference' for doc in docs)
+            # 将邻近 chunk 与原始 chunk 合并：按 source + chunk_index 排序，相邻 chunk 拼接内容
+            merged_docs = _merge_neighbor_chunks(docs)
+            
+            has_reference = any(doc.metadata.get('match_type') == 'reference' for doc in merged_docs)
             
             if has_reference:
-                reference_docs = [doc for doc in docs if doc.metadata.get('match_type') == 'reference']
-                global_docs = [doc for doc in docs if doc.metadata.get('match_type') != 'reference']
+                reference_docs = [doc for doc in merged_docs if doc.metadata.get('match_type') == 'reference']
+                global_docs = [doc for doc in merged_docs if doc.metadata.get('match_type') != 'reference']
                 
                 formatted_str = "=== 参考来源 ===\n"
                 for i, doc in enumerate(reference_docs):
@@ -256,10 +320,10 @@ class RagService(object):
                         doc_info += f"\n来源文件: {source}\n文献标题: {title}\n内容: {doc.page_content}\n\n"
                         formatted_str += doc_info
                 
-                logger.info(f"检索到的参考资料数量: {len(docs)} (参考: {len(reference_docs)}, 其他: {len(global_docs)})")
+                logger.info(f"检索到的参考资料数量: {len(merged_docs)} (参考: {len(reference_docs)}, 其他: {len(global_docs)})")
             else:
                 formatted_str = ""
-                for i, doc in enumerate(docs):
+                for i, doc in enumerate(merged_docs):
                     source = doc.metadata.get('source', '未知')
                     match_type = doc.metadata.get('match_type', 'semantic')
                     chapter = doc.metadata.get('chapter', None)
@@ -273,7 +337,7 @@ class RagService(object):
                             doc_info += f"\n章节: {chapter}"
                     doc_info += f"\n来源: {source}\n文献标题: {title}\n内容: {doc.page_content}\n\n"
                     formatted_str += doc_info
-                logger.info(f"检索到的参考资料数量: {len(docs)}")
+                logger.info(f"检索到的参考资料数量: {len(merged_docs)}")
             
             return formatted_str
 

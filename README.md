@@ -1,6 +1,6 @@
-# RAG 心理学问答系统
+# RAG 学习辅助问答系统
 
-一个基于 Retrieval-Augmented Generation (RAG) 技术的心理学问答系统，支持按章节分割文本、混合检索、本地重排序等功能。采用 FastAPI + 前端界面的前后端分离架构。
+一个基于 Retrieval-Augmented Generation (RAG) 技术的智能学习辅助系统，支持文献管理、混合检索、分源检索等功能。采用 FastAPI + 前端界面的前后端分离架构。
 
 ---
 
@@ -23,7 +23,9 @@
 |------|------|
 | 📄 **多格式文件支持** | txt、pdf、docx、md 文件上传 |
 | 📖 **智能章节分割** | 自动识别章节标题，按章节分割文本 |
-| 🔍 **混合检索** | 关键词检索 + 语义检索 |
+| 📚 **文献标题识别** | 自动识别书名/论文名，记录文献列表 |
+| 🔍 **分源检索** | 支持指定文献检索与全局检索混合使用 |
+| 🔗 **邻近 Chunk 扩展** | 检索结果自动补充物理相邻文本块，保证上下文完整 |
 | 🔄 **本地重排序** | 支持 Ollama 本地模型重排序 |
 | 💬 **会话历史** | 支持多轮对话，流式响应 |
 | 📊 **章节元数据** | 保存章节信息，便于追溯 |
@@ -107,8 +109,11 @@
 - **核心组件**：
   - 嵌入模型（DashScope Embeddings）
   - 向量检索器（VectorStoreService）
-  - 聊天模型（ChatTongyi）
-  - 提示词模板
+  - 聊天模型（ChatOpenAI + DeepSeek）
+  - 提示词模板（含分源检索逻辑）
+- **核心函数**：
+  - `detect_reference_intent()`: 检测用户参考意图，匹配文献标题
+  - `_merge_neighbor_chunks()`: 合并物理上连续的邻近 chunk
 
 #### `knowledge_base.py` - 知识库管理服务
 - **功能**：文档解析、分割、向量化、入库
@@ -116,7 +121,8 @@
   1. 文件解析（支持 txt/pdf/docx/md）
   2. MD5 去重校验
   3. 章节分割（调用 `chapter_splitter.py`）
-  4. 向量化存储（调用 Chroma）
+  4. 文献标题识别（调用 ChatOpenAI 模型）
+  5. 向量化存储（调用 Chroma），每个 chunk 记录 `chunk_index`
 
 ### 4. 数据服务模块
 
@@ -124,6 +130,9 @@
 - **功能**：管理向量数据库，提供检索能力
 - **核心方法**：
   - `hybrid_retrieve()`: 混合检索（关键词+语义）
+  - `retrieve_by_title()`: 基于文献标题的元数据检索
+  - `hybrid_retrieve_with_reference()`: 分源检索（指定文献+全局）
+  - `_expand_with_neighbors()`: 邻近 Chunk 扩展（自动补充物理相邻文本块）
   - 支持 Ollama 重排序
 
 #### `chapter_splitter.py` - 章节分割器
@@ -250,6 +259,17 @@ CHAPTER_MIN_CONTENT_LENGTH = 50  # 最小章节长度
 KEYWORD_WEIGHT = 0.3  # 关键词权重
 SEMANTIC_WEIGHT = 0.7  # 语义权重
 
+# 邻近 Chunk 扩展
+NEIGHBOR_EXPAND_TOP_N = 2  # 对检索结果中前 N 个进行邻近 chunk 扩展
+
+# 文献识别
+LITERATURE_LIST_PATH = './literature_list.json'  # 文献列表存储路径
+REFERENCE_KEYWORDS = ['参考', '依据', '引用', '根据', '出自', '来源', '按照', '参见']
+
+# 模型配置
+chat_model_name = 'deepseek-v4-pro'  # 基座模型（通过百炼平台接入）
+embedding_model_name = 'text-embedding-v4'  # 嵌入模型
+
 # Ollama重排序
 USE_OLLAMA_RERANKER = False  # 启用本地重排序
 OLLAMA_RERANKER_MODEL = 'B-A-M-N/qwen3-reranker-0.6b-fp16:latest'
@@ -362,9 +382,9 @@ RAG/
 ├── vector_stores.py        # 向量存储服务
 ├── chapter_splitter.py     # 章节分割器
 ├── ollama_reranker.py      # Ollama重排序器
-├── file_history_store.py   # 会话历史存储
 ├── config_data.py          # 配置文件
 ├── requirements.txt        # Python依赖
+├── literature_list.json    # 文献列表
 ├── chroma_db/              # 向量数据库
 ├── chat_history/           # 会话历史
 └── .env                    # 环境变量
@@ -374,7 +394,7 @@ RAG/
 
 ## 📌 关键说明
 
-1. **数据持久化**：向量数据存储在 `./chroma_db/`，会话历史存储在 `./chat_history/`
+1. **数据持久化**：向量数据存储在 `./chroma_db/`，会话历史存储在 `./chat_history/`，文献列表存储在 `./literature_list.json`
 2. **去重机制**：使用 MD5 校验避免重复入库
 3. **章节信息**：章节标题、编号等元数据会保存到向量库
 4. **流式响应**：通过 WebSocket 实现打字机效果
@@ -382,7 +402,9 @@ RAG/
    - 知识入库：云端 DashScope Embeddings
    - 检索：云端 DashScope
    - 重排序：可选本地 Ollama
-   - 聊天：云端 ChatTongyi
+   - 聊天：云端 ChatOpenAI (DeepSeek V4 Pro)
+6. **邻近 Chunk 扩展**：检索时自动补充排名靠前结果的物理相邻文本块，连续 chunk 会被合并为完整文档，确保模型获得完整的上下文
+7. **分源检索**：当用户使用"参考""依据"等词汇时，一半检索从指定文献中获取，另一半从全局检索，回复时分开展示
 
 ---
 

@@ -68,6 +68,9 @@ REFERENCE_KEYWORDS = ['参考', '依据', '引用', '根据', '出自', '来源'
 #向量库中返回的检索结果数量
 retrieve_top_k = 10
 
+# 邻近 chunk 扩展配置
+NEIGHBOR_EXPAND_TOP_N = 2  # 对检索结果中前 N 个进行邻近 chunk 扩展
+
 #嵌入模型名称
 embedding_model_name = 'text-embedding-v4'
 chat_model_name = 'deepseek-v4-pro'

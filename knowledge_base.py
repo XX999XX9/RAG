@@ -343,6 +343,7 @@ class KnowledgeBaseService(object):
             
             knowledge_chunks = []
             metadatas = []
+            global_chunk_index = 0
             for doc in docs_with_metadata:
                 chapter_content = doc['content']
                 max_len = min(config.CHAPTER_MAX_CONTENT_LENGTH, 8191)
@@ -355,6 +356,7 @@ class KnowledgeBaseService(object):
                         'chapter': doc['metadata']['chapter'],
                         'chapter_number': doc['metadata']['chapter_number'],
                         'total_chapters': doc['metadata']['total_chapters'],
+                        'chunk_index': global_chunk_index,
                         'sub_chunk_index': i + 1 if len(sub_chunks) > 1 else None,
                         'total_sub_chunks': len(sub_chunks) if len(sub_chunks) > 1 else None,
                         'create_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
@@ -363,6 +365,7 @@ class KnowledgeBaseService(object):
                     }
                     knowledge_chunks.append(sub_chunk)
                     metadatas.append(chunk_metadata)
+                    global_chunk_index += 1
             
             logger.info(f"章节分割完成: {filename}，共识别 {len(docs_with_metadata)} 个章节，分割为 {len(knowledge_chunks)} 个 chunks")
         else:
@@ -372,13 +375,14 @@ class KnowledgeBaseService(object):
                 knowledge_chunks = [data]
 
             metadatas = []
-            for chunk in knowledge_chunks:
+            for idx, chunk in enumerate(knowledge_chunks):
                 chunk_metadata = {
                     'source': filename,
                     'title': literature_title,
                     'chapter': None,
                     'chapter_number': None,
                     'total_chapters': None,
+                    'chunk_index': idx,
                     'create_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                     'operator': 'administrator',
                     'keywords': extract_keywords(chunk)
