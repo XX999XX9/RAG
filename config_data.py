@@ -1,7 +1,7 @@
 #配置文件
 
 # 服务端口配置
-SERVER_PORT = 8989  # 后端服务端口
+SERVER_PORT = 8000  # 后端服务端口
 SERVER_HOST = "0.0.0.0"  # 服务绑定地址
 
 # 文件解析配置
@@ -11,11 +11,9 @@ PDF_PARSE_START_PAGE = 0  # PDF起始解析页码
 PDF_PARSE_END_PAGE = None  # PDF结束解析页码（None表示全部）
 DOCX_IGNORE_HEADER_FOOTER = True  # Word解析是否忽略页眉页脚
 
-md5_path = './md5.txt'
-
 #Chroma
 collection_name = 'RAG'#向量数据的集合名，类似关系型数据的的表名
-persist_directory = './chroma_db'#向量数据的本地存储目录
+# 存储目录统一由各服务模块基于自身文件位置解析绝对路径（chroma_db/）
 
 #spliter
 chunk_size = 1000
@@ -62,15 +60,17 @@ RETRIEVE_MERGE_STRATEGY = 'weighted'  # 结果合并策略：weighted（加权�
 DOC_UNIQUE_ID_PREFIX = 'doc_'  # 文档唯一ID前缀（如doc_xxx_paragraph_yyy）
 
 # 文献识别配置
-LITERATURE_LIST_PATH = './literature_list.json'  # 文献列表存储路径
-REFERENCE_KEYWORDS = ['参考', '依据', '引用', '根据', '出自', '来源', '按照', '参见']  # 触发分源检索的关键词
+# 注意：不应包含"根据""按照"等中文高频词，否则普通提问会误触发分源检索
+REFERENCE_KEYWORDS = ['参考', '依据', '引用', '出自', '来源', '参见']  # 触发分源检索的关键词
 
 #向量库中返回的检索结果数量
 retrieve_top_k = 10
 
-# 邻近 chunk 扩展配置（LLM驱动）
+# 重排序后保留的结果数量
+rerank_top_k = 3
+
+# 邻近 chunk 扩展配置（LLM驱动，单次判断 + 批量获取）
 USE_LLM_CHUNK_EXPANSION = True  # 启用 LLM 驱动的邻近 chunk 扩展
-LLM_CHUNK_EXPANSION_MAX_ITERATIONS = 2  # LLM 判断完整性的最大迭代次数
 
 #嵌入模型名称
 embedding_model_name = 'text-embedding-v4'
@@ -78,12 +78,19 @@ chat_model_name = 'deepseek-v4-pro'
 
 # Ollama 模型配置（本地部署的模型）
 OLLAMA_HOST = 'http://localhost:11434'  # Ollama 服务地址
-OLLAMA_RERANKER_MODEL = 'B-A-M-N/qwen3-reranker-0.6b-fp16:latest'  # 用于重排序的模型
+# 必须与 `ollama list` 中的模型名完全一致
+OLLAMA_RERANKER_MODEL = 'bbjson/bge-reranker-base:latest'
 
 # 独立的模型使用开关
-USE_OLLAMA_RERANKER = False  # 是否使用 Ollama 重排序（检索和重排）
+USE_OLLAMA_RERANKER = True  # 是否使用 Ollama 重排序（检索和重排）
 # 知识入库始终使用云端嵌入模型（DashScope）
-# 聊天模型始终使用云端模型（ChatTongyi）
+# 聊天模型始终使用云端模型（deepseek）
+
+# 会话历史配置
+MAX_HISTORY_MESSAGES = 20  # 送入模型的最大历史消息条数（防 token 超限），取最近 N 条
+
+# 回收站配置（软删除）
+RECYCLE_RETENTION_DAYS = 0  # 回收站文件保留天数，超过后定期任务自动彻底删除；0 表示不启用自动清理
 
 #session id配置
 session_config={

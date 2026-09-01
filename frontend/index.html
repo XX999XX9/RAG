@@ -7,7 +7,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="/static/marked.min.js"></script>
+    <script src="/static/purify.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -513,218 +514,7 @@
             cursor: not-allowed;
         }
 
-        /* File Management View */
-        #fileView {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-        }
-
-        .file-view-header {
-            padding: 2rem;
-            flex-shrink: 0;
-            background-color: var(--bg-primary);
-            border-bottom: 1px solid var(--border-color);
-            width: 100%;
-            box-sizing: border-box;
-        }
-
-        .file-view-content {
-            flex: 1;
-            padding: 2rem;
-            overflow-y: auto;
-            width: 100%;
-            box-sizing: border-box;
-        }
-
-        .file-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 2rem;
-        }
-
-        .file-title {
-            font-size: 1.25rem;
-            font-weight: 600;
-            color: var(--text-primary);
-        }
-
-        .upload-area {
-            border: 2px dashed var(--border-color);
-            border-radius: 1rem;
-            padding: 3rem;
-            text-align: center;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            margin-bottom: 2rem;
-        }
-
-        .upload-area:hover {
-            border-color: var(--accent-primary);
-            background-color: rgba(59, 130, 246, 0.05);
-        }
-
-        .upload-area.dragover {
-            border-color: var(--accent-primary);
-            background-color: rgba(59, 130, 246, 0.1);
-        }
-
-        .upload-icon {
-            font-size: 3rem;
-            color: var(--text-muted);
-            margin-bottom: 1rem;
-        }
-
-        .upload-text {
-            font-size: 1rem;
-            color: var(--text-secondary);
-            margin-bottom: 0.5rem;
-        }
-
-        .upload-hint {
-            font-size: 0.8125rem;
-            color: var(--text-muted);
-        }
-
-        .file-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-            gap: 1rem;
-        }
-
-        .file-card {
-            background-color: var(--bg-secondary);
-            border-radius: 0.75rem;
-            padding: 1.25rem;
-            display: flex;
-            flex-direction: column;
-            gap: 0.75rem;
-            transition: all 0.2s ease;
-        }
-
-        .file-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-        }
-
-        .file-icon-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-        }
-
-        .file-icon {
-            width: 48px;
-            height: 48px;
-            background-color: rgba(59, 130, 246, 0.1);
-            border-radius: 0.75rem;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.5rem;
-        }
-
-        .file-actions {
-            display: flex;
-            gap: 0.25rem;
-        }
-
-        .file-action-btn {
-            padding: 0.375rem;
-            border: none;
-            border-radius: 0.375rem;
-            background: transparent;
-            color: var(--text-muted);
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-
-        .file-action-btn:hover {
-            background-color: var(--bg-tertiary);
-            color: var(--error-color);
-        }
-
-        .file-name {
-            font-size: 0.9375rem;
-            font-weight: 500;
-            color: var(--text-primary);
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-
-        .file-meta {
-            font-size: 0.75rem;
-            color: var(--text-muted);
-            display: flex;
-            gap: 1rem;
-        }
-
-        .no-files {
-            text-align: center;
-            padding: 4rem;
-            color: var(--text-muted);
-        }
-
-        .no-files-icon {
-            font-size: 3rem;
-            margin-bottom: 1rem;
-        }
-
-        .literature-list {
-            display: flex;
-            flex-direction: column;
-            gap: 0.5rem;
-        }
-
-        .literature-item {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            padding: 0.75rem 1rem;
-            background-color: var(--bg-secondary);
-            border-radius: 0.5rem;
-            transition: all 0.2s ease;
-        }
-
-        .literature-item:hover {
-            background-color: var(--bg-tertiary);
-        }
-
-        .literature-icon {
-            font-size: 1.25rem;
-            flex-shrink: 0;
-        }
-
-        .literature-info {
-            flex: 1;
-            min-width: 0;
-        }
-
-        .literature-title {
-            font-size: 0.9375rem;
-            font-weight: 500;
-            color: var(--text-primary);
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-
-        .literature-filename {
-            font-size: 0.75rem;
-            color: var(--text-muted);
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-
-        .literature-time {
-            font-size: 0.6875rem;
-            color: var(--text-muted);
-            flex-shrink: 0;
-        }
+        /* File Management View 相关样式已随功能迁移至 admin.html */
 
         /* Loading Animation */
         .loading {
@@ -826,12 +616,12 @@
         </div>
 
         <div class="sidebar-nav">
-            <button class="nav-item active" id="navChats" onclick="switchView('chats')">
+            <button class="nav-item active" id="navChats">
                 对话
             </button>
-            <button class="nav-item" id="navFiles" onclick="switchView('files')">
-                文件
-            </button>
+            <a class="nav-item" id="navAdmin" href="/admin" style="text-decoration: none;">
+                管理员入口
+            </a>
         </div>
 
         <div class="chat-history" id="chatHistory">
@@ -884,62 +674,7 @@
             </div>
         </div>
 
-        <!-- File Management View -->
-        <div id="fileView" style="display: none;">
-            <header>
-                <div class="current-chat-title">文件管理</div>
-            </header>
-
-            <div class="file-view-header">
-                <div class="file-header">
-                    <h2 class="file-title">上传文件到知识库</h2>
-                    <button class="btn btn-primary" onclick="document.getElementById('fileInput').click()">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                            <polyline points="17 8 12 3 7 8"/>
-                            <line x1="12" x2="12" y1="3" y2="15"/>
-                        </svg>
-                        选择文件
-                    </button>
-                </div>
-
-                <div 
-                    class="upload-area" 
-                    id="uploadArea"
-                    ondragover="event.preventDefault(); this.classList.add('dragover')"
-                    ondragleave="this.classList.remove('dragover')"
-                    ondrop="event.preventDefault(); this.classList.remove('dragover'); handleDrop(event)"
-                >
-                    <div class="upload-icon">📁</div>
-                    <div class="upload-text">拖拽文件到这里上传</div>
-                    <div class="upload-hint">支持 txt, pdf, docx, md 格式，单文件最大 200MB</div>
-                </div>
-
-                <input type="file" id="fileInput" style="display: none;" accept=".txt,.pdf,.docx,.md" onchange="handleFileSelect(this)">
-
-                <div id="uploadProgress" style="display: none; margin-bottom: 1.5rem; padding: 1rem; background: var(--bg-secondary); border-radius: 8px;">
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.875rem; color: var(--text-secondary);">
-                        <span>上传中...</span>
-                        <span id="progressText">0%</span>
-                    </div>
-                    <div style="height: 8px; background: var(--border-color); border-radius: 4px; overflow: hidden;">
-                        <div id="progressBar" style="height: 100%; background: linear-gradient(90deg, var(--primary-color), var(--accent-color)); width: 0%; transition: width 0.3s ease;"></div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="file-view-content">
-                <h3 style="margin-bottom: 1rem; font-size: 1rem; font-weight: 600; color: var(--text-primary);">文献列表</h3>
-                <div id="literatureGrid" style="margin-bottom: 2rem;">
-                </div>
-
-                <h3 style="margin-bottom: 1rem; font-size: 1rem; font-weight: 600; color: var(--text-primary);">已上传文件</h3>
-                
-                <div class="file-grid" id="fileGrid">
-                    <!-- File cards will be populated dynamically -->
-                </div>
-            </div>
-        </div>
+        <!-- File Management View 已迁移至管理员页面 /admin -->
     </main>
 
     <!-- Toast Container -->
@@ -951,12 +686,51 @@
         let chats = [];
         let currentChatId = null;
 
+        // 可选 API Key：首次通过 URL ?key=xxx 传入后缓存到 localStorage（与后端 .env 中 RAG_API_KEY 对应）
+        let API_KEY = localStorage.getItem('apiKey') || '';
+        {
+            const urlKey = new URLSearchParams(location.search).get('key');
+            if (urlKey) {
+                API_KEY = urlKey;
+                localStorage.setItem('apiKey', urlKey);
+            }
+        }
+
+        function apiUrl(path) {
+            if (!API_KEY) return `${API_BASE}${path}`;
+            const sep = path.includes('?') ? '&' : '?';
+            return `${API_BASE}${path}${sep}api_key=${encodeURIComponent(API_KEY)}`;
+        }
+
+        function apiHeaders() {
+            return API_KEY ? { 'X-API-Key': API_KEY } : {};
+        }
+
+        function wsUrl() {
+            const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+            const key = API_KEY ? `?api_key=${encodeURIComponent(API_KEY)}` : '';
+            return `${proto}://${location.host}/api/chat/ws${key}`;
+        }
+
         // 初始化
         document.addEventListener('DOMContentLoaded', () => {
             loadChats();
-            loadFiles();
-            loadLiterature();
+            bindDelegatedEvents();
         });
+
+        // 事件委托：避免把动态数据拼进内联 onclick（防 XSS / 语法破坏）
+        function bindDelegatedEvents() {
+            document.getElementById('chatHistory').addEventListener('click', (e) => {
+                const del = e.target.closest('.chat-delete');
+                if (del) {
+                    e.stopPropagation();
+                    deleteChat(del.dataset.deleteId);
+                    return;
+                }
+                const item = e.target.closest('.chat-item');
+                if (item) selectChat(item.dataset.chatId);
+            });
+        }
 
         // 加载对话列表
         async function loadChats() {
@@ -992,6 +766,7 @@
         function createNewChat() {
             const newChat = {
                 id: Date.now().toString(),
+                sessionId: 'chat-' + Date.now().toString() + '-' + Math.random().toString(36).slice(2, 10),
                 title: '新对话',
                 messages: [],
                 createdAt: new Date().toISOString()
@@ -1013,19 +788,20 @@
             }
 
             container.innerHTML = chats.map(chat => {
-                const preview = chat.messages.length > 0 
-                    ? chat.messages[chat.messages.length - 1].content.substring(0, 30) + (chat.messages[chat.messages.length - 1].content.length > 30 ? '...' : '')
+                const lastMsg = chat.messages.length > 0 ? chat.messages[chat.messages.length - 1] : null;
+                const preview = lastMsg
+                    ? lastMsg.content.substring(0, 30) + (lastMsg.content.length > 30 ? '...' : '')
                     : '暂无消息';
                 const time = new Date(chat.createdAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
-                
+
                 return `
-                    <div class="chat-item ${chat.id === currentChatId ? 'active' : ''}" onclick="selectChat('${chat.id}')">
+                    <div class="chat-item ${chat.id === currentChatId ? 'active' : ''}" data-chat-id="${escapeHtml(chat.id)}">
                         <div class="chat-info">
-                            <div class="chat-title">${chat.title}</div>
-                            <div class="chat-preview">${preview}</div>
+                            <div class="chat-title">${escapeHtml(chat.title)}</div>
+                            <div class="chat-preview">${escapeHtml(preview)}</div>
                         </div>
-                        <div class="chat-time">${time}</div>
-                        <span class="chat-delete" onclick="event.stopPropagation(); deleteChat('${chat.id}')">✕</span>
+                        <div class="chat-time">${escapeHtml(time)}</div>
+                        <span class="chat-delete" data-delete-id="${escapeHtml(chat.id)}">✕</span>
                     </div>
                 `;
             }).join('');
@@ -1074,279 +850,6 @@
             }
         }
 
-        // 切换视图
-        function switchView(view) {
-            document.getElementById('navChats').classList.toggle('active', view === 'chats');
-            document.getElementById('navFiles').classList.toggle('active', view === 'files');
-            document.getElementById('chatView').style.display = view === 'chats' ? 'flex' : 'none';
-            document.getElementById('fileView').style.display = view === 'files' ? 'flex' : 'none';
-            
-            if (view === 'chats') {
-                setTimeout(() => {
-                    var container = document.getElementById('messagesContainer');
-                    var lastMsg = container ? container.lastElementChild : null;
-                    if (lastMsg) {
-                        lastMsg.scrollIntoView({ behavior: 'auto', block: 'end' });
-                    }
-                }, 50);
-            }
-            
-            if (view === 'files') {
-                loadFiles();
-                loadLiterature();
-            }
-        }
-
-        // 加载文件列表
-        async function loadFiles() {
-            try {
-                const response = await fetch(`${API_BASE}/files`);
-                const data = await response.json();
-                if (data.success) {
-                    renderFileGrid(data.files);
-                }
-            } catch (error) {
-                console.error('Failed to load files:', error);
-            }
-        }
-
-        // 加载文献列表
-        async function loadLiterature() {
-            try {
-                const response = await fetch(`${API_BASE}/literature`);
-                const data = await response.json();
-                if (data.success) {
-                    renderLiteratureGrid(data.literature);
-                }
-            } catch (error) {
-                console.error('Failed to load literature:', error);
-            }
-        }
-
-        // 渲染文献列表
-        function renderLiteratureGrid(literature) {
-            const container = document.getElementById('literatureGrid');
-            
-            if (!literature || literature.length === 0) {
-                container.innerHTML = `
-                    <div style="text-align: center; padding: 1.5rem; color: var(--text-muted); font-size: 0.875rem;">
-                        暂无文献记录
-                    </div>
-                `;
-                return;
-            }
-
-            container.innerHTML = `<div class="literature-list">` + literature.map(item => {
-                const icon = item.title.includes('论') ? '📑' : '📖';
-                return `
-                    <div class="literature-item">
-                        <div class="literature-icon">${icon}</div>
-                        <div class="literature-info">
-                            <div class="literature-title">${item.title}</div>
-                            <div class="literature-filename">${item.filename}</div>
-                        </div>
-                        <div class="literature-time">${item.add_time || ''}</div>
-                    </div>
-                `;
-            }).join('') + `</div>`;
-        }
-
-        // 渲染文件网格
-        function renderFileGrid(files) {
-            const container = document.getElementById('fileGrid');
-            
-            if (!files || files.length === 0) {
-                container.innerHTML = `
-                    <div class="no-files">
-                        <div class="no-files-icon">📄</div>
-                        <div>暂无上传的文件</div>
-                    </div>
-                `;
-                return;
-            }
-
-            container.innerHTML = files.map(file => {
-                const ext = file.split('.').pop().toLowerCase();
-                const icon = getFileIcon(ext);
-                return `
-                    <div class="file-card">
-                        <div class="file-icon-row">
-                            <div class="file-icon">${icon}</div>
-                            <div class="file-actions">
-                                <button class="file-action-btn" onclick="deleteFile('${file}')">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                        <path d="M3 6h18"/>
-                                        <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
-                                        <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
-                                    </svg>
-                                </button>
-                            </div>
-                        </div>
-                        <div class="file-name">${file}</div>
-                        <div class="file-meta">
-                            <span>${ext.toUpperCase()} 文件</span>
-                        </div>
-                    </div>
-                `;
-            }).join('');
-        }
-
-        // 获取文件图标
-        function getFileIcon(ext) {
-            const icons = {
-                'txt': '📝',
-                'pdf': '📕',
-                'docx': '📘',
-                'md': '📗'
-            };
-            return icons[ext] || '📄';
-        }
-
-        // 处理文件选择
-        function handleFileSelect(input) {
-            if (input.files.length > 0) {
-                uploadFile(input.files[0]);
-            }
-            input.value = '';
-        }
-
-        // 处理拖放
-        function handleDrop(event) {
-            const files = event.dataTransfer.files;
-            if (files.length > 0) {
-                uploadFile(files[0]);
-            }
-        }
-
-        // 上传文件
-        function uploadFile(file) {
-            const maxSize = 200 * 1024 * 1024;
-            if (file.size > maxSize) {
-                showToast(`文件大小超过限制（最大200MB），当前文件大小：${(file.size / 1024 / 1024).toFixed(2)}MB`, 'error');
-                return;
-            }
-            
-            const fileExt = file.name.split('.').pop().toLowerCase();
-            const supportedTypes = ['txt', 'pdf', 'docx', 'md'];
-            if (!supportedTypes.includes(fileExt)) {
-                showToast(`不支持的文件类型: ${fileExt}，支持的类型: ${supportedTypes.join(', ')}`, 'error');
-                return;
-            }
-            
-            const progressContainer = document.getElementById('uploadProgress');
-            const progressBar = document.getElementById('progressBar');
-            const progressText = document.getElementById('progressText');
-            const uploadArea = document.querySelector('.upload-area');
-            
-            progressContainer.style.display = 'block';
-            progressBar.style.width = '0%';
-            progressText.textContent = '上传中 0%';
-            if (uploadArea) {
-                uploadArea.style.pointerEvents = 'none';
-                uploadArea.style.opacity = '0.6';
-            }
-            
-            const formData = new FormData();
-            formData.append('file', file);
-            
-            const xhr = new XMLHttpRequest();
-            xhr.timeout = 1800000;
-            
-            xhr.upload.onprogress = (event) => {
-                if (event.lengthComputable) {
-                    const percent = Math.round((event.loaded / event.total) * 100);
-                    progressBar.style.width = percent + '%';
-                    if (percent < 100) {
-                        progressText.textContent = `上传中 ${percent}%`;
-                    } else {
-                        progressText.textContent = '文件处理中，请稍候...';
-                        progressBar.style.background = 'linear-gradient(90deg, #f59e0b, #ef4444)';
-                    }
-                }
-            };
-            
-            xhr.onload = () => {
-                progressContainer.style.display = 'none';
-                if (uploadArea) {
-                    uploadArea.style.pointerEvents = '';
-                    uploadArea.style.opacity = '';
-                }
-                if (xhr.status >= 200 && xhr.status < 300) {
-                    try {
-                        const data = JSON.parse(xhr.responseText);
-                        if (data.success === true && data.message && data.message.startsWith('[成功]')) {
-                            showToast('文件上传成功：' + data.message, 'success');
-                            loadFiles();
-                            loadLiterature();
-                        } else if (data.success === false && data.message && data.message.startsWith('[跳过]')) {
-                            showToast('文件已存在：' + data.message, 'error');
-                        } else {
-                            showToast('上传失败：' + (data.message || data.detail || '未知错误'), 'error');
-                        }
-                    } catch (e) {
-                        showToast('上传失败：服务器响应解析错误', 'error');
-                    }
-                } else {
-                    let errorMsg = '上传失败';
-                    try {
-                        const data = JSON.parse(xhr.responseText);
-                        errorMsg = data.detail || data.message || '未知错误';
-                    } catch (e) {
-                        errorMsg = `服务器错误 (${xhr.status})`;
-                    }
-                    showToast('上传失败：' + errorMsg, 'error');
-                }
-            };
-            
-            xhr.onerror = () => {
-                progressContainer.style.display = 'none';
-                if (uploadArea) {
-                    uploadArea.style.pointerEvents = '';
-                    uploadArea.style.opacity = '';
-                }
-                showToast('上传失败：网络错误，请检查网络连接', 'error');
-            };
-            
-            xhr.ontimeout = () => {
-                progressContainer.style.display = 'none';
-                if (uploadArea) {
-                    uploadArea.style.pointerEvents = '';
-                    uploadArea.style.opacity = '';
-                }
-                showToast('上传失败：请求超时，文件可能过大', 'error');
-            };
-            
-            xhr.open('POST', `${API_BASE}/upload`);
-            xhr.send(formData);
-        }
-
-        // 删除文件
-        async function deleteFile(filename) {
-            if (!confirm(`确定要从知识库中删除 "${filename}" 吗？此操作不可恢复。`)) return;
-            
-            try {
-                const response = await fetch(`${API_BASE}/files/${encodeURIComponent(filename)}`, {
-                    method: 'DELETE'
-                });
-                
-                const data = await response.json();
-                
-                if (data.success && data.message && data.message.startsWith('[成功]')) {
-                    showToast('文件删除成功', 'success');
-                    loadFiles();
-                    loadLiterature();
-                } else if (data.message && data.message.startsWith('[提示]')) {
-                    showToast('提示：' + data.message, 'error');
-                    loadFiles();
-                    loadLiterature();
-                } else {
-                    showToast('删除失败：' + (data.message || data.detail || '未知错误'), 'error');
-                }
-            } catch (error) {
-                showToast('删除失败：' + error.message, 'error');
-            }
-        }
-
         // 发送消息
         async function sendMessage() {
             const input = document.getElementById('inputField');
@@ -1380,11 +883,11 @@
             renderMessages(chat.messages, true); // 添加加载状态后也滚动到底部
             
             try {
-                // 使用 WebSocket 流式响应
-                const ws = new WebSocket(`ws://${window.location.host}/api/chat/ws`);
-                
+                // 使用 WebSocket 流式响应（携带会话 ID，保证服务端能取到多轮历史）
+                const ws = new WebSocket(wsUrl());
+
                 ws.onopen = () => {
-                    ws.send(JSON.stringify({ message }));
+                    ws.send(JSON.stringify({ message, session_id: chat.sessionId }));
                 };
                 
                 let assistantMsgIndex = chat.messages.length - 1;
@@ -1425,10 +928,10 @@
         // 回退到 HTTP 请求
         async function fallbackHTTPRequest(message, chat, index) {
             try {
-                const response = await fetch(`${API_BASE}/chat`, {
+                const response = await fetch(apiUrl('/chat'), {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message, history: [] })
+                    headers: { 'Content-Type': 'application/json', ...apiHeaders() },
+                    body: JSON.stringify({ message, session_id: chat.sessionId })
                 });
                 
                 const data = await response.json();
@@ -1524,14 +1027,18 @@
             }, 3000);
         }
 
-        // HTML 转义
+        // HTML 转义（覆盖引号，可安全用于属性与文本上下文）
         function escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
+            return String(text ?? '').replace(/[&<>"']/g, (c) => ({
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#39;'
+            }[c]));
         }
 
-        // Markdown 渲染
+        // Markdown 渲染（经 DOMPurify 消毒，防止文档内容注入脚本）
         function renderMarkdown(text) {
             if (!text) return '';
             try {
@@ -1539,7 +1046,7 @@
                     breaks: true,
                     gfm: true
                 });
-                return marked.parse(text);
+                return DOMPurify.sanitize(marked.parse(text));
             } catch (e) {
                 return escapeHtml(text);
             }

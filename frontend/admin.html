@@ -1,0 +1,1274 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>管理控制台 - 学习问答助手</title>
+    <script src="/static/marked.min.js"></script>
+    <script src="/static/purify.min.js"></script>
+    <style>
+        :root {
+            --bg-primary: #ffffff;
+            --bg-secondary: #f9fafb;
+            --bg-tertiary: #f3f4f6;
+            --text-primary: #111827;
+            --text-secondary: #6b7280;
+            --text-muted: #9ca3af;
+            --border-color: #e5e7eb;
+            --primary-color: #111827;
+            --accent-color: #374151;
+            --danger-color: #ef4444;
+            --success-color: #10b981;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            height: 100vh;
+            display: flex;
+            overflow: hidden;
+        }
+
+        /* ===== 侧边栏 ===== */
+        .sidebar {
+            width: 260px;
+            background: var(--bg-primary);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+        }
+
+        .sidebar-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .logo-icon {
+            width: 36px;
+            height: 36px;
+            background: var(--primary-color);
+            color: white;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 1.1rem;
+        }
+
+        .logo span {
+            font-weight: 600;
+            font-size: 0.95rem;
+        }
+
+        .sidebar-nav {
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 0.625rem;
+            padding: 0.625rem 0.875rem;
+            border-radius: 8px;
+            cursor: pointer;
+            color: var(--text-secondary);
+            border: none;
+            background: none;
+            font-size: 0.9rem;
+            font-family: inherit;
+            width: 100%;
+            text-align: left;
+            transition: all 0.15s ease;
+        }
+
+        .nav-item:hover {
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+        }
+
+        .nav-item.active {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        .nav-item a { text-decoration: none; }
+
+        /* ===== 主内容 ===== */
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .topbar {
+            height: 56px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 1.5rem;
+            flex-shrink: 0;
+        }
+
+        .topbar-title {
+            font-weight: 600;
+            font-size: 1rem;
+        }
+
+        .topbar-actions { display: flex; gap: 0.5rem; }
+
+        .btn {
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            background: var(--bg-primary);
+            cursor: pointer;
+            font-size: 0.875rem;
+            font-family: inherit;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: all 0.15s ease;
+        }
+
+        .btn:hover { background: var(--bg-secondary); }
+        .btn-primary { background: var(--primary-color); color: white; border-color: var(--primary-color); }
+        .btn-primary:hover { background: var(--accent-color); }
+
+        .view {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+
+        .view.hidden { display: none; }
+
+        /* ===== 列表面板（左） ===== */
+        .list-panel {
+            width: 320px;
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+        }
+
+        .list-panel-header {
+            padding: 1rem;
+            border-bottom: 1px solid var(--border-color);
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .list-panel-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 0.5rem;
+        }
+
+        .list-item {
+            padding: 0.75rem;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.15s ease;
+            margin-bottom: 0.25rem;
+            border: 1px solid transparent;
+        }
+
+        .list-item:hover { background: var(--bg-secondary); }
+        .list-item.active { background: var(--bg-secondary); border-color: var(--border-color); }
+
+        .list-item-title {
+            font-size: 0.875rem;
+            font-weight: 500;
+            word-break: break-all;
+            margin-bottom: 0.25rem;
+        }
+
+        .list-item-meta {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            display: flex;
+            gap: 0.75rem;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 3rem 1rem;
+            color: var(--text-muted);
+            font-size: 0.875rem;
+        }
+
+        /* ===== 详情面板（右） ===== */
+        .detail-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .detail-header {
+            padding: 1rem 1.5rem;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .detail-title {
+            font-weight: 600;
+            word-break: break-all;
+        }
+
+        .detail-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1.5rem;
+        }
+
+        /* ===== 聊天记录渲染 ===== */
+        .msg {
+            margin-bottom: 1.25rem;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .msg.user { align-items: flex-end; }
+
+        .msg-bubble {
+            max-width: 78%;
+            padding: 0.75rem 1rem;
+            border-radius: 12px;
+            font-size: 0.9rem;
+            line-height: 1.6;
+            word-break: break-word;
+        }
+
+        .msg.user .msg-bubble {
+            background: var(--primary-color);
+            color: white;
+            border-bottom-right-radius: 4px;
+        }
+
+        .msg.assistant .msg-bubble {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-bottom-left-radius: 4px;
+        }
+
+        .msg-bubble table { border-collapse: collapse; margin: 0.5rem 0; }
+        .msg-bubble th, .msg-bubble td { border: 1px solid var(--border-color); padding: 0.375rem 0.625rem; font-size: 0.85rem; }
+        .msg-bubble th { background: var(--bg-tertiary); }
+        .msg-bubble pre { background: var(--bg-tertiary); padding: 0.75rem; border-radius: 6px; overflow-x: auto; margin: 0.5rem 0; }
+        .msg-bubble code { font-family: 'SF Mono', Consolas, monospace; font-size: 0.825rem; }
+
+        .msg-meta {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            margin-top: 0.25rem;
+        }
+
+        /* ===== 引用序号 ===== */
+        .citations {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.375rem;
+            margin-top: 0.5rem;
+            align-items: center;
+        }
+
+        .citations-label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        .citation-badge {
+            width: 1.5rem;
+            height: 1.5rem;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            background: var(--bg-primary);
+            color: var(--text-secondary);
+            font-size: 0.75rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.15s ease;
+        }
+
+        .citation-badge:hover {
+            background: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
+        }
+
+        /* ===== chunk 卡片 ===== */
+        .chunk-card {
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            background: var(--bg-primary);
+        }
+
+        .chunk-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.75rem;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+        }
+
+        .chunk-index {
+            font-size: 0.75rem;
+            font-weight: 600;
+            background: var(--bg-tertiary);
+            padding: 0.25rem 0.5rem;
+            border-radius: 6px;
+        }
+
+        .chunk-content {
+            font-size: 0.875rem;
+            line-height: 1.65;
+            white-space: pre-wrap;
+            word-break: break-word;
+            color: var(--text-primary);
+            margin-bottom: 0.75rem;
+        }
+
+        .meta-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 0.5rem;
+        }
+
+        .meta-item {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 0.5rem 0.625rem;
+        }
+
+        .meta-key {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            margin-bottom: 0.125rem;
+        }
+
+        .meta-value {
+            font-size: 0.8rem;
+            word-break: break-all;
+        }
+
+        /* ===== 分页 ===== */
+        .pagination {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+            padding: 1rem;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .pagination-info { font-size: 0.8rem; color: var(--text-secondary); }
+        .pagination button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+        /* ===== 弹窗 ===== */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            padding: 2rem;
+        }
+
+        .modal-overlay.hidden { display: none; }
+
+        .modal {
+            background: var(--bg-primary);
+            border-radius: 12px;
+            width: 720px;
+            max-width: 100%;
+            max-height: 82vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+        }
+
+        .modal-header {
+            padding: 1rem 1.25rem;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .modal-title { font-weight: 600; font-size: 0.95rem; }
+
+        .modal-close {
+            border: none;
+            background: none;
+            font-size: 1.25rem;
+            cursor: pointer;
+            color: var(--text-muted);
+            padding: 0.25rem;
+        }
+
+        .modal-close:hover { color: var(--text-primary); }
+
+        .modal-body {
+            padding: 1.25rem;
+            overflow-y: auto;
+        }
+
+        .doc-content {
+            white-space: pre-wrap;
+            word-break: break-word;
+            font-size: 0.875rem;
+            line-height: 1.65;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        /* ===== 上传区（知识库管理） ===== */
+        .upload-area {
+            border: 2px dashed var(--border-color);
+            border-radius: 10px;
+            padding: 1.25rem;
+            text-align: center;
+            cursor: pointer;
+            transition: border-color 0.2s ease;
+            margin-bottom: 1rem;
+        }
+
+        .upload-area:hover, .upload-area.dragover { border-color: var(--primary-color); }
+        .upload-text { font-size: 0.875rem; color: var(--text-secondary); }
+        .upload-hint { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem; }
+
+        .progress-wrap { margin-bottom: 1rem; }
+        .progress-bar-bg {
+            height: 8px;
+            background: var(--bg-tertiary);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .progress-bar-fill {
+            height: 100%;
+            background: var(--primary-color);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        .section-title {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin: 1.25rem 0 0.5rem;
+        }
+
+        /* ===== Toast ===== */
+        #toastContainer {
+            position: fixed;
+            top: 1.25rem;
+            right: 1.25rem;
+            z-index: 2000;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .toast {
+            padding: 0.75rem 1.25rem;
+            border-radius: 8px;
+            color: white;
+            font-size: 0.875rem;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            animation: slideIn 0.3s ease;
+            max-width: 360px;
+        }
+
+        .toast.success { background: var(--success-color); }
+        .toast.error { background: var(--danger-color); }
+
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+    </style>
+</head>
+<body>
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <div class="logo">
+                <div class="logo-icon">R</div>
+                <span>管理控制台</span>
+            </div>
+        </div>
+
+        <div class="sidebar-nav">
+            <button class="nav-item active" id="navSessions">会话记录</button>
+            <button class="nav-item" id="navDocuments">知识库文档</button>
+            <button class="nav-item" id="navManage">知识库管理</button>
+            <a class="nav-item" href="/chat" style="text-decoration: none;">返回用户页</a>
+        </div>
+    </aside>
+
+    <!-- Main -->
+    <main class="main-content">
+        <div class="topbar">
+            <div class="topbar-title" id="topbarTitle">会话记录</div>
+            <div class="topbar-actions">
+                <button class="btn" onclick="refreshCurrentView()">刷新</button>
+            </div>
+        </div>
+
+        <!-- 会话记录视图 -->
+        <div class="view" id="sessionsView">
+            <div class="list-panel">
+                <div class="list-panel-header">用户会话</div>
+                <div class="list-panel-body" id="sessionList"></div>
+            </div>
+            <div class="detail-panel">
+                <div class="detail-header">
+                    <div class="detail-title" id="sessionDetailTitle">选择左侧会话查看聊天记录</div>
+                </div>
+                <div class="detail-body" id="sessionDetailBody">
+                    <div class="empty-state">点击左侧会话，查看完整聊天记录与检索引用</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 知识库文档视图 -->
+        <div class="view hidden" id="documentsView">
+            <div class="list-panel">
+                <div class="list-panel-header">知识库文档（向量库实存数据）</div>
+                <div class="list-panel-body" id="documentList"></div>
+            </div>
+            <div class="detail-panel">
+                <div class="detail-header">
+                    <div class="detail-title" id="documentDetailTitle">选择左侧文档浏览向量分块</div>
+                </div>
+                <div class="detail-body" id="documentDetailBody">
+                    <div class="empty-state">点击左侧文档，按分页浏览该文档在向量库中的全部分块与元数据</div>
+                </div>
+                <div class="pagination" id="documentPagination" style="display: none;">
+                    <button class="btn" id="prevPageBtn" onclick="changePage(-1)">上一页</button>
+                    <span class="pagination-info" id="pageInfo"></span>
+                    <button class="btn" id="nextPageBtn" onclick="changePage(1)">下一页</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 知识库管理视图（上传 / 删除 / 回收站） -->
+        <div class="view hidden" id="manageView">
+            <div class="detail-panel">
+                <div class="detail-header">
+                    <div class="detail-title">上传文件到知识库</div>
+                </div>
+                <div class="detail-body" style="max-width: 960px;">
+                    <div class="upload-area" id="uploadArea">
+                        <div class="upload-text">拖拽文件到这里，或点击选择文件</div>
+                        <div class="upload-hint">支持 txt, pdf, docx, md 格式，单文件最大 200MB</div>
+                    </div>
+                    <input type="file" id="fileInput" style="display: none;" accept=".txt,.pdf,.docx,.md">
+                    <div class="progress-wrap" id="uploadProgress" style="display: none;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 0.375rem; font-size: 0.8rem; color: var(--text-secondary);">
+                            <span>上传中...</span><span id="progressText">0%</span>
+                        </div>
+                        <div class="progress-bar-bg"><div class="progress-bar-fill" id="progressBar"></div></div>
+                    </div>
+
+                    <div class="section-title">已上传文件</div>
+                    <div id="fileGrid"></div>
+
+                    <div class="section-title" style="margin-top: 2rem;">回收站（软删除）</div>
+                    <div class="upload-hint" style="margin-bottom: 0.5rem;">
+                        回收站中的文件仍保留在向量库中，但检索与模型读取全流程不可见；可恢复或彻底删除
+                    </div>
+                    <div id="recycleGrid"></div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- 参考资料弹窗 -->
+    <div class="modal-overlay hidden" id="docModal">
+        <div class="modal">
+            <div class="modal-header">
+                <div class="modal-title" id="docModalTitle">参考资料</div>
+                <button class="modal-close" onclick="closeDocModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="doc-content" id="docModalContent"></div>
+                <div class="section-title" style="margin-top: 0;">元数据</div>
+                <div class="meta-grid" id="docModalMeta"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 确认操作弹窗 -->
+    <div class="modal-overlay hidden" id="confirmModal">
+        <div class="modal" style="width: 420px;">
+            <div class="modal-header">
+                <div class="modal-title" id="confirmTitle">确认操作</div>
+                <button class="modal-close" onclick="resolveConfirm(false)">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="doc-content" id="confirmMessage" style="background: none; border: none; padding: 0;"></div>
+                <div style="display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1.5rem;">
+                    <button class="btn" onclick="resolveConfirm(false)">取消</button>
+                    <button class="btn btn-primary" id="confirmOkBtn" onclick="resolveConfirm(true)">确认</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="toastContainer"></div>
+
+    <script>
+        // ===== 管理员密钥（与后端 .env 的 ADMIN_API_KEY 对应；未设置则无需携带）=====
+        let ADMIN_KEY = localStorage.getItem('adminApiKey') || '';
+        {
+            const urlKey = new URLSearchParams(location.search).get('key');
+            if (urlKey) {
+                ADMIN_KEY = urlKey;
+                localStorage.setItem('adminApiKey', urlKey);
+            }
+        }
+
+        const state = {
+            view: 'sessions',
+            sessions: [],
+            currentSessionId: null,
+            retrievals: [],      // 当前会话的检索审计记录
+            documents: [],
+            currentDocument: null,
+            docPage: 1,
+            docPageSize: 20,
+            docTotal: 0,
+        };
+
+        function apiHeaders() { return ADMIN_KEY ? { 'X-API-Key': ADMIN_KEY } : {}; }
+        function apiUrl(path) {
+            if (!ADMIN_KEY) return `/api${path}`;
+            const sep = path.includes('?') ? '&' : '?';
+            return `/api${path}${sep}api_key=${encodeURIComponent(ADMIN_KEY)}`;
+        }
+
+        function escapeHtml(text) {
+            return String(text ?? '').replace(/[&<>"']/g, (c) => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+            }[c]));
+        }
+
+        function renderMarkdown(text) {
+            if (!text) return '';
+            try {
+                marked.setOptions({ breaks: true, gfm: true });
+                return DOMPurify.sanitize(marked.parse(text));
+            } catch (e) {
+                return escapeHtml(text);
+            }
+        }
+
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.textContent = message;
+            container.appendChild(toast);
+            setTimeout(() => toast.remove(), 3500);
+        }
+
+        // ===== 视图切换 =====
+        function switchView(view) {
+            state.view = view;
+            document.getElementById('sessionsView').classList.toggle('hidden', view !== 'sessions');
+            document.getElementById('documentsView').classList.toggle('hidden', view !== 'documents');
+            document.getElementById('manageView').classList.toggle('hidden', view !== 'manage');
+            document.getElementById('navSessions').classList.toggle('active', view === 'sessions');
+            document.getElementById('navDocuments').classList.toggle('active', view === 'documents');
+            document.getElementById('navManage').classList.toggle('active', view === 'manage');
+            document.getElementById('topbarTitle').textContent = {
+                sessions: '会话记录', documents: '知识库文档', manage: '知识库管理'
+            }[view];
+        }
+
+        function refreshCurrentView() {
+            if (state.view === 'sessions') loadSessions();
+            if (state.view === 'documents') loadDocuments();
+            if (state.view === 'manage') loadFileList();
+        }
+
+        // ===== 会话记录 =====
+        async function loadSessions() {
+            const container = document.getElementById('sessionList');
+            container.innerHTML = '<div class="empty-state">加载中...</div>';
+            try {
+                const res = await fetch(apiUrl('/admin/sessions'), { headers: apiHeaders() });
+                const data = await res.json();
+                if (!data.success) throw new Error(data.detail || '加载失败');
+                state.sessions = data.sessions || [];
+                if (state.sessions.length === 0) {
+                    container.innerHTML = '<div class="empty-state">暂无会话记录</div>';
+                    return;
+                }
+                container.innerHTML = state.sessions.map((s, i) => `
+                    <div class="list-item ${s.session_id === state.currentSessionId ? 'active' : ''}"
+                         data-session-index="${i}">
+                        <div class="list-item-title">${escapeHtml(s.preview || s.session_id)}</div>
+                        <div class="list-item-meta">
+                            <span>${escapeHtml(s.session_id)}</span>
+                            <span>${s.messages} 条消息</span>
+                        </div>
+                        <div class="list-item-meta"><span>${escapeHtml(s.last_active)}</span></div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                container.innerHTML = `<div class="empty-state">加载失败：${escapeHtml(error.message)}</div>`;
+            }
+        }
+
+        async function openSession(sessionId) {
+            state.currentSessionId = sessionId;
+            document.getElementById('sessionDetailTitle').textContent = sessionId;
+            const body = document.getElementById('sessionDetailBody');
+            body.innerHTML = '<div class="empty-state">加载中...</div>';
+            try {
+                const [msgRes, retRes] = await Promise.all([
+                    fetch(apiUrl(`/admin/sessions/${encodeURIComponent(sessionId)}`), { headers: apiHeaders() }),
+                    fetch(apiUrl(`/admin/sessions/${encodeURIComponent(sessionId)}/retrievals`), { headers: apiHeaders() }),
+                ]);
+                const msgData = await msgRes.json();
+                const retData = await retRes.json();
+                if (!msgData.success) throw new Error(msgData.detail || '加载失败');
+                state.retrievals = (retData.success && retData.retrievals) || [];
+                renderSessionMessages(msgData.messages || []);
+            } catch (error) {
+                body.innerHTML = `<div class="empty-state">加载失败：${escapeHtml(error.message)}</div>`;
+            }
+        }
+
+        function renderSessionMessages(messages) {
+            const body = document.getElementById('sessionDetailBody');
+            if (messages.length === 0) {
+                body.innerHTML = '<div class="empty-state">该会话暂无消息</div>';
+                return;
+            }
+
+            // 检索记录按追加顺序与第 N 条 AI 回复一一对应
+            let assistantIndex = 0;
+            const html = messages.map(msg => {
+                const isUser = msg.role === 'human';
+                const contentHtml = isUser ? escapeHtml(msg.content) : renderMarkdown(msg.content);
+
+                let citationsHtml = '';
+                if (!isUser) {
+                    const record = state.retrievals[assistantIndex];
+                    assistantIndex += 1;
+                    if (record && record.docs && record.docs.length > 0) {
+                        const badges = record.docs.map((doc, i) =>
+                            `<span class="citation-badge" data-record="${assistantIndex - 1}" data-doc="${i}" title="查看参考资料 ${i + 1}">${i + 1}</span>`
+                        ).join('');
+                        citationsHtml = `
+                            <div class="citations">
+                                <span class="citations-label">检索参考资料：</span>${badges}
+                            </div>`;
+                    }
+                }
+
+                return `
+                    <div class="msg ${isUser ? 'user' : 'assistant'}">
+                        <div class="msg-bubble">${contentHtml}</div>
+                        ${citationsHtml}
+                    </div>
+                `;
+            }).join('');
+
+            body.innerHTML = html;
+            body.scrollTop = body.scrollHeight;
+        }
+
+        // ===== 知识库文档（向量库浏览） =====
+        async function loadDocuments() {
+            const container = document.getElementById('documentList');
+            container.innerHTML = '<div class="empty-state">加载中...</div>';
+            try {
+                const res = await fetch(apiUrl('/admin/documents'), { headers: apiHeaders() });
+                const data = await res.json();
+                if (!data.success) throw new Error(data.detail || '加载失败');
+                state.documents = data.documents || [];
+                if (state.documents.length === 0) {
+                    container.innerHTML = '<div class="empty-state">向量库为空</div>';
+                    return;
+                }
+                container.innerHTML = state.documents.map((d, i) => `
+                    <div class="list-item ${d.source === state.currentDocument ? 'active' : ''}" data-document-index="${i}">
+                        <div class="list-item-title">${escapeHtml(d.source)}</div>
+                        <div class="list-item-meta">
+                            <span>${escapeHtml(d.title || '')}</span>
+                            <span>${d.chunks} 个分块</span>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                container.innerHTML = `<div class="empty-state">加载失败：${escapeHtml(error.message)}</div>`;
+            }
+        }
+
+        async function openDocument(source, page = 1) {
+            state.currentDocument = source;
+            state.docPage = page;
+            document.getElementById('documentDetailTitle').textContent = source;
+            const body = document.getElementById('documentDetailBody');
+            body.innerHTML = '<div class="empty-state">加载中...</div>';
+            try {
+                const res = await fetch(
+                    apiUrl(`/admin/documents/${encodeURIComponent(source)}/chunks?page=${page}&page_size=${state.docPageSize}`),
+                    { headers: apiHeaders() }
+                );
+                const data = await res.json();
+                if (!data.success) throw new Error(data.detail || '加载失败');
+                state.docTotal = data.total;
+                renderChunks(data.items || []);
+                renderPagination();
+            } catch (error) {
+                body.innerHTML = `<div class="empty-state">加载失败：${escapeHtml(error.message)}</div>`;
+            }
+        }
+
+        function renderChunks(items) {
+            const body = document.getElementById('documentDetailBody');
+            if (items.length === 0) {
+                body.innerHTML = '<div class="empty-state">该文档暂无分块数据</div>';
+                return;
+            }
+            body.innerHTML = items.map(item => {
+                const meta = item.metadata || {};
+                const metaHtml = Object.entries(meta)
+                    .filter(([k, v]) => v !== null && v !== undefined && v !== '')
+                    .map(([k, v]) => `
+                        <div class="meta-item">
+                            <div class="meta-key">${escapeHtml(k)}</div>
+                            <div class="meta-value">${escapeHtml(v)}</div>
+                        </div>
+                    `).join('');
+                const chunkNo = meta.chunk_index !== undefined ? `chunk #${meta.chunk_index}` : 'chunk';
+                return `
+                    <div class="chunk-card">
+                        <div class="chunk-card-header">
+                            <span class="chunk-index">${escapeHtml(chunkNo)}</span>
+                        </div>
+                        <div class="chunk-content">${escapeHtml(item.content)}</div>
+                        ${metaHtml ? `<div class="meta-grid">${metaHtml}</div>` : ''}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderPagination() {
+            const pagination = document.getElementById('documentPagination');
+            const totalPages = Math.max(Math.ceil(state.docTotal / state.docPageSize), 1);
+            if (state.docTotal <= state.docPageSize) {
+                pagination.style.display = 'none';
+                return;
+            }
+            pagination.style.display = 'flex';
+            document.getElementById('pageInfo').textContent = `第 ${state.docPage} / ${totalPages} 页（共 ${state.docTotal} 条分块）`;
+            document.getElementById('prevPageBtn').disabled = state.docPage <= 1;
+            document.getElementById('nextPageBtn').disabled = state.docPage >= totalPages;
+        }
+
+        function changePage(delta) {
+            if (!state.currentDocument) return;
+            openDocument(state.currentDocument, state.docPage + delta);
+        }
+
+        // ===== 确认弹窗（Promise 化，删除/恢复/彻底删除均需确认后才执行） =====
+        let _confirmResolver = null;
+
+        function confirmDialog(title, message, okText = '确认') {
+            return new Promise((resolve) => {
+                _confirmResolver = resolve;
+                document.getElementById('confirmTitle').textContent = title;
+                document.getElementById('confirmMessage').textContent = message;
+                document.getElementById('confirmOkBtn').textContent = okText;
+                document.getElementById('confirmModal').classList.remove('hidden');
+            });
+        }
+
+        function resolveConfirm(result) {
+            document.getElementById('confirmModal').classList.add('hidden');
+            if (_confirmResolver) {
+                _confirmResolver(result);
+                _confirmResolver = null;
+            }
+        }
+
+        // ===== 知识库管理（上传 / 软删除 / 回收站） =====
+        async function loadFileList() {
+            const container = document.getElementById('fileGrid');
+            container.innerHTML = '<div class="empty-state">加载中...</div>';
+            try {
+                const res = await fetch(apiUrl('/files'), { headers: apiHeaders() });
+                const data = await res.json();
+                if (!data.success) throw new Error(data.detail || '加载失败');
+                const files = data.files || [];
+                if (files.length === 0) {
+                    container.innerHTML = '<div class="empty-state">暂无上传的文件</div>';
+                    return;
+                }
+                container.innerHTML = files.map(file => `
+                    <div class="chunk-card">
+                        <div class="chunk-card-header">
+                            <span class="chunk-index">文件</span>
+                            <button class="btn" data-soft-delete="${escapeHtml(file)}">移入回收站</button>
+                        </div>
+                        <div class="chunk-content">${escapeHtml(file)}</div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                container.innerHTML = `<div class="empty-state">加载失败：${escapeHtml(error.message)}</div>`;
+            }
+        }
+
+        async function loadRecycleBin() {
+            const container = document.getElementById('recycleGrid');
+            container.innerHTML = '<div class="empty-state">加载中...</div>';
+            try {
+                const res = await fetch(apiUrl('/admin/recycle'), { headers: apiHeaders() });
+                const data = await res.json();
+                if (!data.success) throw new Error(data.detail || '加载失败');
+                const items = data.items || [];
+                if (items.length === 0) {
+                    container.innerHTML = '<div class="empty-state">回收站为空</div>';
+                    return;
+                }
+                container.innerHTML = items.map(item => `
+                    <div class="chunk-card">
+                        <div class="chunk-card-header">
+                            <span class="chunk-index">回收站</span>
+                            <div style="display: flex; gap: 0.5rem;">
+                                <button class="btn" data-restore="${escapeHtml(item.filename)}">恢复</button>
+                                <button class="btn" data-purge="${escapeHtml(item.filename)}">彻底删除</button>
+                            </div>
+                        </div>
+                        <div class="chunk-content">${escapeHtml(item.filename)}</div>
+                        <div class="meta-grid">
+                            <div class="meta-item">
+                                <div class="meta-key">原文献标题</div>
+                                <div class="meta-value">${escapeHtml(item.title || '未知')}</div>
+                            </div>
+                            <div class="meta-item">
+                                <div class="meta-key">删除时间</div>
+                                <div class="meta-value">${escapeHtml(item.deleted_time || '')}</div>
+                            </div>
+                            <div class="meta-item">
+                                <div class="meta-key">分块数量</div>
+                                <div class="meta-value">${item.chunks}</div>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                container.innerHTML = `<div class="empty-state">加载失败：${escapeHtml(error.message)}</div>`;
+            }
+        }
+
+        function uploadFile(file) {
+            const maxSize = 200 * 1024 * 1024;
+            if (file.size > maxSize) {
+                showToast(`文件大小超过限制（最大200MB），当前：${(file.size / 1024 / 1024).toFixed(2)}MB`, 'error');
+                return;
+            }
+            const fileExt = file.name.split('.').pop().toLowerCase();
+            const supportedTypes = ['txt', 'pdf', 'docx', 'md'];
+            if (!supportedTypes.includes(fileExt)) {
+                showToast(`不支持的文件类型: ${fileExt}`, 'error');
+                return;
+            }
+
+            const progressContainer = document.getElementById('uploadProgress');
+            const progressBar = document.getElementById('progressBar');
+            const progressText = document.getElementById('progressText');
+            progressContainer.style.display = 'block';
+            progressBar.style.width = '0%';
+            progressText.textContent = '上传中 0%';
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            const xhr = new XMLHttpRequest();
+            xhr.timeout = 1800000;
+            xhr.upload.onprogress = (event) => {
+                if (event.lengthComputable) {
+                    const percent = Math.round((event.loaded / event.total) * 100);
+                    progressBar.style.width = percent + '%';
+                    progressText.textContent = percent < 100 ? `上传中 ${percent}%` : '文件处理中，请稍候...';
+                }
+            };
+            xhr.onload = () => {
+                progressContainer.style.display = 'none';
+                if (xhr.status >= 200 && xhr.status < 300) {
+                    try {
+                        const data = JSON.parse(xhr.responseText);
+                        if (data.success === true) {
+                            showToast('上传成功', 'success');
+                        } else if (data.message && data.message.startsWith('[跳过]')) {
+                            showToast('文件已存在', 'error');
+                        } else {
+                            showToast('上传失败：' + (data.message || data.detail || '未知错误'), 'error');
+                        }
+                        loadFileList();
+                    } catch (e) {
+                        showToast('上传失败：服务器响应解析错误', 'error');
+                    }
+                } else {
+                    let errorMsg = `服务器错误 (${xhr.status})`;
+                    try {
+                        const data = JSON.parse(xhr.responseText);
+                        errorMsg = data.detail || data.message || errorMsg;
+                    } catch (e) { /* 保持默认 */ }
+                    showToast('上传失败：' + errorMsg, 'error');
+                }
+            };
+            xhr.onerror = () => {
+                progressContainer.style.display = 'none';
+                showToast('上传失败：网络错误', 'error');
+            };
+            xhr.ontimeout = () => {
+                progressContainer.style.display = 'none';
+                showToast('上传失败：请求超时', 'error');
+            };
+            xhr.open('POST', apiUrl('/upload'));
+            if (ADMIN_KEY) xhr.setRequestHeader('X-API-Key', ADMIN_KEY);
+            xhr.send(formData);
+        }
+
+        // 软删除：先弹确认框，确认后才移入回收站（物理数据不动，仅打不可用标签）
+        async function softDeleteFile(filename) {
+            const confirmed = await confirmDialog(
+                '移入回收站',
+                `确定要将文件 "${filename}" 移入回收站吗？\n移入后该文件在检索与模型回复中立即不可见，可随时从回收站恢复。`,
+                '移入回收站'
+            );
+            if (!confirmed) return;
+
+            try {
+                const res = await fetch(apiUrl(`/files/${encodeURIComponent(filename)}`), {
+                    method: 'DELETE',
+                    headers: apiHeaders()
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showToast('已移入回收站：' + filename, 'success');
+                } else {
+                    showToast('操作失败：' + (data.message || data.detail || '未知错误'), 'error');
+                }
+                loadFileList();
+                loadRecycleBin();
+            } catch (error) {
+                showToast('操作失败：' + error.message, 'error');
+            }
+        }
+
+        // 从回收站恢复（需确认）
+        async function restoreRecycleFile(filename) {
+            const confirmed = await confirmDialog(
+                '恢复文件',
+                `确定要恢复文件 "${filename}" 吗？恢复后该文件将重新对检索与模型回复可见。`,
+                '恢复'
+            );
+            if (!confirmed) return;
+
+            try {
+                const res = await fetch(apiUrl(`/admin/recycle/${encodeURIComponent(filename)}/restore`), {
+                    method: 'POST',
+                    headers: apiHeaders()
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showToast('已恢复：' + filename, 'success');
+                } else {
+                    showToast('恢复失败：' + (data.message || data.detail || '未知错误'), 'error');
+                }
+                loadFileList();
+                loadRecycleBin();
+            } catch (error) {
+                showToast('恢复失败：' + error.message, 'error');
+            }
+        }
+
+        // 彻底删除（需确认，不可恢复）
+        async function purgeRecycleFile(filename) {
+            const confirmed = await confirmDialog(
+                '彻底删除',
+                `确定要彻底删除文件 "${filename}" 吗？\n将物理删除该文件在向量库中的全部分块与记录，此操作不可恢复！`,
+                '彻底删除'
+            );
+            if (!confirmed) return;
+
+            try {
+                const res = await fetch(apiUrl(`/admin/recycle/${encodeURIComponent(filename)}`), {
+                    method: 'DELETE',
+                    headers: apiHeaders()
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showToast('已彻底删除：' + filename, 'success');
+                } else {
+                    showToast('彻底删除失败：' + (data.message || data.detail || '未知错误'), 'error');
+                }
+                loadFileList();
+                loadRecycleBin();
+            } catch (error) {
+                showToast('彻底删除失败：' + error.message, 'error');
+            }
+        }
+
+        // ===== 参考资料弹窗 =====
+        function openDocModal(recordIndex, docIndex) {
+            const record = state.retrievals[recordIndex];
+            if (!record || !record.docs || !record.docs[docIndex]) return;
+            const doc = record.docs[docIndex];
+            const meta = doc.metadata || {};
+
+            document.getElementById('docModalTitle').textContent = `参考资料 ${docIndex + 1}（来自：${meta.source || '未知'}）`;
+            document.getElementById('docModalContent').textContent = doc.content || '';
+
+            const metaHtml = Object.entries(meta)
+                .filter(([k, v]) => v !== null && v !== undefined && v !== '')
+                .map(([k, v]) => `
+                    <div class="meta-item">
+                        <div class="meta-key">${escapeHtml(k)}</div>
+                        <div class="meta-value">${escapeHtml(v)}</div>
+                    </div>
+                `).join('');
+            document.getElementById('docModalMeta').innerHTML = metaHtml || '<div class="empty-state">无元数据</div>';
+
+            document.getElementById('docModal').classList.remove('hidden');
+        }
+
+        function closeDocModal() {
+            document.getElementById('docModal').classList.add('hidden');
+        }
+
+        // ===== 事件绑定（委托，避免内联拼接动态数据） =====
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('navSessions').addEventListener('click', () => switchView('sessions'));
+            document.getElementById('navDocuments').addEventListener('click', () => switchView('documents'));
+            document.getElementById('navManage').addEventListener('click', () => {
+                switchView('manage');
+                loadFileList();
+                loadRecycleBin();
+            });
+
+            document.getElementById('sessionList').addEventListener('click', (e) => {
+                const item = e.target.closest('.list-item');
+                if (item) openSession(state.sessions[Number(item.dataset.sessionIndex)].session_id);
+            });
+
+            document.getElementById('documentList').addEventListener('click', (e) => {
+                const item = e.target.closest('.list-item');
+                if (item) openDocument(state.documents[Number(item.dataset.documentIndex)].source, 1);
+            });
+
+            // 引用序号点击 → 查看参考资料原文与元数据
+            document.getElementById('sessionDetailBody').addEventListener('click', (e) => {
+                const badge = e.target.closest('.citation-badge');
+                if (badge) {
+                    openDocModal(Number(badge.dataset.record), Number(badge.dataset.doc));
+                }
+            });
+
+            // 知识库管理：文件软删除（修复：绑定到 fileGrid 容器，原先误绑在 sessionDetailBody 上导致点击无效）
+            document.getElementById('fileGrid').addEventListener('click', (e) => {
+                const btn = e.target.closest('button[data-soft-delete]');
+                if (btn) softDeleteFile(btn.dataset.softDelete);
+            });
+
+            // 回收站：恢复 / 彻底删除
+            document.getElementById('recycleGrid').addEventListener('click', (e) => {
+                const restoreBtn = e.target.closest('button[data-restore]');
+                if (restoreBtn) {
+                    restoreRecycleFile(restoreBtn.dataset.restore);
+                    return;
+                }
+                const purgeBtn = e.target.closest('button[data-purge]');
+                if (purgeBtn) purgeRecycleFile(purgeBtn.dataset.purge);
+            });
+
+            // 确认弹窗遮罩点击 = 取消
+            document.getElementById('confirmModal').addEventListener('click', (e) => {
+                if (e.target === e.currentTarget) resolveConfirm(false);
+            });
+
+            // 参考资料弹窗遮罩点击关闭
+            document.getElementById('docModal').addEventListener('click', (e) => {
+                if (e.target === e.currentTarget) closeDocModal();
+            });
+
+            // 上传交互
+            const uploadArea = document.getElementById('uploadArea');
+            const fileInput = document.getElementById('fileInput');
+            uploadArea.addEventListener('click', () => fileInput.click());
+            fileInput.addEventListener('change', () => {
+                if (fileInput.files.length > 0) uploadFile(fileInput.files[0]);
+                fileInput.value = '';
+            });
+            uploadArea.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                uploadArea.classList.add('dragover');
+            });
+            uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('dragover'));
+            uploadArea.addEventListener('drop', (e) => {
+                e.preventDefault();
+                uploadArea.classList.remove('dragover');
+                if (e.dataTransfer.files.length > 0) uploadFile(e.dataTransfer.files[0]);
+            });
+
+            // 初始视图
+            switchView('sessions');
+            loadSessions();
+        });
+    </script>
+</body>
+</html>

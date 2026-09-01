@@ -23,7 +23,6 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from datetime import datetime
 import fitz
 from docx import Document
-import jieba
 
 # MD5 文件操作锁（线程安全）
 md5_lock = threading.Lock()
@@ -31,6 +30,9 @@ md5_lock = threading.Lock()
 # 导入章节分割器
 if config.USE_CHAPTER_SPLITTER:
     from chapter_splitter import ChapterSplitter
+
+# 关键词提取统一复用 rag.py 中的实现（返回列表），此处包装为元数据所需的逗号分隔字符串
+from rag import extract_keywords as _extract_keyword_list
 
 # RAG 目录的绝对路径
 RAG_DIR = Path(__file__).parent.resolve()
@@ -46,8 +48,11 @@ base_url = os.getenv('BAILIAN_BASE_URL')
 MD5_FILE_PATH = RAG_DIR / 'md5.txt'
 PERSIST_DIRECTORY = RAG_DIR / 'chroma_db'
 LITERATURE_LIST_PATH = RAG_DIR / 'literature_list.json'
+# 回收站记录（软删除文件的管理信息：md5/标题/删除时间，供恢复与定期清理使用）
+RECYCLE_BIN_PATH = RAG_DIR / 'recycle_bin.json'
 
 literature_lock = threading.Lock()
+recycle_lock = threading.Lock()
 
 
 def identify_literature_title(filename: str, text_sample: str) -> str:
@@ -143,36 +148,227 @@ def remove_literature_item(filename: str):
         except Exception as e:
             logger.error(f"文献记录删除失败: {str(e)}")
 
-#文件解析函数
-def parse_file(file_obj, file_type: str) -> str:
+
+# ==================== 回收站（软删除） ====================
+
+def load_recycle_bin() -> dict:
+    """加载回收站记录: {filename: {md5, title, deleted_time, chunks}}"""
+    with recycle_lock:
+        try:
+            if RECYCLE_BIN_PATH.exists():
+                with open(RECYCLE_BIN_PATH, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+            return {}
+        except Exception as e:
+            logger.error(f"加载回收站记录失败: {str(e)}")
+            return {}
+
+
+def _save_recycle_bin(records: dict):
+    with recycle_lock:
+        with open(RECYCLE_BIN_PATH, 'w', encoding='utf-8') as f:
+            json.dump(records, f, ensure_ascii=False, indent=2)
+
+
+def _read_md5_record(filename: str) -> str:
+    """读取 md5.txt 中指定文件名的 md5 值（无记录返回空串）"""
+    with md5_lock:
+        if not MD5_FILE_PATH.exists():
+            return ''
+        for line in MD5_FILE_PATH.read_text(encoding='utf-8').splitlines():
+            line = line.strip()
+            if line and '|' in line:
+                stored_md5, stored_name = line.split('|', 1)
+                if stored_name.strip() == filename:
+                    return stored_md5.strip()
+    return ''
+
+
+def _find_literature_title(filename: str) -> str:
+    """读取文献列表中指定文件名的标题（无记录返回空串）"""
+    for item in load_literature_list():
+        if item.get('filename') == filename:
+            return item.get('title', '')
+    return ''
+
+
+def _remove_md5_record(filename: str):
+    """从 md5.txt 中精确移除指定文件名的记录行"""
+    with md5_lock:
+        if not MD5_FILE_PATH.exists():
+            return
+        with open(MD5_FILE_PATH, 'r', encoding='utf-8') as f:
+            lines = f.readlines()
+        new_lines = []
+        for line in lines:
+            stripped = line.strip()
+            if stripped and '|' in stripped:
+                if stripped.split('|', 1)[1].strip() == filename:
+                    continue
+            new_lines.append(line)
+        with open(MD5_FILE_PATH, 'w', encoding='utf-8') as f:
+            f.writelines(new_lines)
+
+
+def list_alive_files_from_store(chroma) -> list:
     """
-    解析不同类型文件为纯文本
-    file_obj: streamlit上传的文件对象（BytesIO）
-    file_type: 文件类型（txt/pdf/docx/md）
+    从向量库聚合存活（未被软删除）的文件名列表。
+    文件列表以向量库本身为数据源，md5.txt 仅用于上传查重，
+    避免辅助记录文件损坏/丢失导致文件列表为空。
     """
-    if file_type == 'txt':
-        return file_obj.getvalue().decode('utf-8')
-    elif file_type == 'pdf':
-        doc = fitz.open(stream=file_obj.getvalue(), filetype="pdf")
-        text = ''.join(page.get_text() or '' for page in doc)
-        doc.close()
-        if not text.strip():
-            raise RuntimeError("PDF内容为空，无法提取文字。可能原因：1)扫描件PDF 2)图片型PDF 3)特殊编码PDF")
-        return text
-    elif file_type == 'docx':
-        doc = Document(file_obj)
-        lines = []
-        for para in doc.paragraphs:
-            if config.DOCX_IGNORE_HEADER_FOOTER and (para.text.strip() == "" or para.style.name in ['Header', 'Footer']):
+    files = []
+    seen = set()
+    batch = 1000
+    offset = 0
+    while True:
+        res = chroma.get(where={'deleted': {'$ne': 'true'}},
+                         include=['metadatas'], limit=batch, offset=offset)
+        metas = res.get('metadatas') or []
+        if not metas:
+            break
+        for meta in metas:
+            source = (meta or {}).get('source')
+            if source and source not in seen:
+                seen.add(source)
+                files.append(source)
+        if len(metas) < batch:
+            break
+        offset += batch
+    files.sort()
+    return files
+
+
+def soft_delete_file_to_recycle(chroma, filename: str) -> str:
+    """
+    软删除：将文件移入回收站（物理数据不动，仅打不可用标签）
+    - 向量库中该文件全部分块的 metadata 标记 deleted='true'
+    - md5 与文献记录暂存到回收站记录（重传同内容文件不受影响）
+    - 检索/模型读取全流程通过存活过滤器屏蔽该文件
+    """
+    try:
+        results = chroma.get(where={'source': filename}, include=['metadatas'])
+        ids = results.get('ids') or []
+        metas = results.get('metadatas') or []
+        if not ids:
+            return '[提示]未找到文件的数据'
+
+        now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        new_metas = [
+            {**(meta or {}), 'deleted': 'true', 'deleted_time': now}
+            for meta in metas
+        ]
+        chroma.update(ids=ids, metadatas=new_metas)
+
+        # 记录管理信息（md5 / 文献标题），供恢复与定期清理使用
+        records = load_recycle_bin()
+        records[filename] = {
+            'md5': _read_md5_record(filename),
+            'title': _find_literature_title(filename),
+            'deleted_time': now,
+            'chunks': len(ids),
+        }
+        _save_recycle_bin(records)
+
+        # 移除 md5 与文献记录（允许重新上传；恢复时写回）
+        _remove_md5_record(filename)
+        remove_literature_item(filename)
+
+        logger.info(f"文件已移入回收站（软删除）: {filename}，共标记 {len(ids)} 个分块")
+        return f'[成功]文件已移入回收站: {filename}'
+    except Exception as e:
+        logger.error(f"软删除失败: {filename}, {str(e)}")
+        return f'[失败]移入回收站失败: {str(e)}'
+
+
+def restore_file_from_recycle(chroma, filename: str) -> str:
+    """
+    从回收站恢复文件：去除全部回收站分块的不可用标签，写回 md5 与文献记录
+    """
+    try:
+        records = load_recycle_bin()
+        if filename not in records:
+            return '[提示]该文件不在回收站中'
+
+        # 同名文件已被重新上传时不允许恢复（避免数据重复）
+        if _read_md5_record(filename):
+            return '[失败]同名文件已存在于知识库中，请先删除后再恢复'
+
+        results = chroma.get(
+            where={'$and': [{'source': filename}, {'deleted': {'$eq': 'true'}}]},
+            include=['metadatas'],
+        )
+        ids = results.get('ids') or []
+        metas = results.get('metadatas') or []
+        if not ids:
+            return '[提示]未找到文件的回收站数据'
+
+        new_metas = []
+        for meta in metas:
+            meta = dict(meta or {})
+            meta['deleted'] = ''
+            meta.pop('deleted_time', None)
+            new_metas.append(meta)
+        chroma.update(ids=ids, metadatas=new_metas)
+
+        # 写回 md5 与文献记录
+        record = records.pop(filename)
+        if record.get('md5'):
+            save_md5(record['md5'], filename)
+        if record.get('title'):
+            save_literature_item(filename, record['title'])
+        _save_recycle_bin(records)
+
+        logger.info(f"文件已从回收站恢复: {filename}，共恢复 {len(ids)} 个分块")
+        return f'[成功]已从回收站恢复文件: {filename}'
+    except Exception as e:
+        logger.error(f"恢复失败: {filename}, {str(e)}")
+        return f'[失败]恢复失败: {str(e)}'
+
+
+def clean_expired_recycle(chroma, retention_days: int) -> list:
+    """
+    彻底清理回收站中删除时间超过 retention_days 天的文件（供定期自动清理调用）
+    返回本次彻底删除的文件名列表
+    """
+    if retention_days <= 0:
+        return []
+    cleaned = []
+    try:
+        records = load_recycle_bin()
+        threshold = datetime.now().timestamp() - retention_days * 86400
+        for filename in list(records.keys()):
+            deleted_time = records[filename].get('deleted_time', '')
+            try:
+                ts = datetime.strptime(deleted_time, '%Y-%m-%d %H:%M:%S').timestamp()
+            except ValueError:
                 continue
-            lines.append(para.text)
-        return '\n'.join(lines)
-    elif file_type == 'md':
-        return file_obj.getvalue().decode('utf-8')
-    else:
-        raise ValueError(f"不支持的文件类型：{file_type}")
+            if ts >= threshold:
+                continue
+            if _purge_file_from_vector_store(chroma, filename):
+                records.pop(filename, None)
+                cleaned.append(filename)
+        if cleaned:
+            _save_recycle_bin(records)
+            logger.info(f"回收站自动清理完成: 彻底删除 {len(cleaned)} 个文件: {cleaned}")
+    except Exception as e:
+        logger.error(f"回收站自动清理失败: {str(e)}")
+    return cleaned
 
 
+def _purge_file_from_vector_store(chroma, filename: str) -> bool:
+    """从向量库物理删除指定文件的全部分块（含回收站分块）"""
+    try:
+        results = chroma.get(where={'source': filename}, include=[])
+        ids = results.get('ids') or []
+        if ids:
+            chroma.delete(ids=ids)
+        logger.info(f"已从向量库彻底删除: {filename}（{len(ids)} 个分块）")
+        return True
+    except Exception as e:
+        logger.error(f"从向量库彻底删除失败: {filename}, {str(e)}")
+        return False
+
+#文件解析函数
 def check_md5(md5_str:str):
     """
     检查传入的md5字符串是否已经被处理过了
@@ -227,14 +423,9 @@ def get_string_md5(input_str:str,encoding='utf-8'):
 def extract_keywords(text: str) -> str:
     """
     从文本中提取关键词，返回逗号分隔的字符串
-    ChromaDB要求metadata值为字符串或数字，不能是列表
+    ChromaDB要求 metadata 值为字符串或数字，不能是列表
     """
-    words = jieba.cut(text)
-    keywords = []
-    for word in words:
-        if word not in config.KEYWORD_STOP_WORDS and len(word) >= config.KEYWORD_MIN_LENGTH:
-            keywords.append(word)
-    result = list(set(keywords))[:10]
+    result = _extract_keyword_list(text)
     return ','.join(result) if result else ''
 
 
@@ -335,7 +526,6 @@ class KnowledgeBaseService(object):
             return '[跳过]内容已经存在知识库中'
 
         literature_title = identify_literature_title(filename, data)
-        save_literature_item(filename, literature_title)
         logger.info(f"文献标题识别完成: {filename} -> {literature_title}")
 
         if self.chapter_splitter:
@@ -357,11 +547,12 @@ class KnowledgeBaseService(object):
                         'chapter_number': doc['metadata']['chapter_number'],
                         'total_chapters': doc['metadata']['total_chapters'],
                         'chunk_index': global_chunk_index,
-                        'sub_chunk_index': i + 1 if len(sub_chunks) > 1 else None,
-                        'total_sub_chunks': len(sub_chunks) if len(sub_chunks) > 1 else None,
+                        'sub_chunk_index': i + 1 if len(sub_chunks) > 1 else '',
+                        'total_sub_chunks': len(sub_chunks) if len(sub_chunks) > 1 else '',
                         'create_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                         'operator': 'administrator',
-                        'keywords': extract_keywords(sub_chunk)
+                        'keywords': extract_keywords(sub_chunk),
+                        'deleted': ''
                     }
                     knowledge_chunks.append(sub_chunk)
                     metadatas.append(chunk_metadata)
@@ -379,13 +570,14 @@ class KnowledgeBaseService(object):
                 chunk_metadata = {
                     'source': filename,
                     'title': literature_title,
-                    'chapter': None,
-                    'chapter_number': None,
-                    'total_chapters': None,
+                    'chapter': '',
+                    'chapter_number': '',
+                    'total_chapters': '',
                     'chunk_index': idx,
                     'create_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                     'operator': 'administrator',
-                    'keywords': extract_keywords(chunk)
+                    'keywords': extract_keywords(chunk),
+                    'deleted': ''
                 }
                 metadatas.append(chunk_metadata)
 
@@ -398,6 +590,8 @@ class KnowledgeBaseService(object):
             logger.info(f"向量入库成功: {filename}，分割为 {len(knowledge_chunks)} 个 chunks")
 
             save_md5(md5_hex, filename)
+            # 文献记录在向量入库成功后再写入，避免入库失败时产生"幽灵文献"
+            save_literature_item(filename, literature_title)
 
             return '[成功]内容已经成功载入向量库'
         except Exception as e:
@@ -457,41 +651,78 @@ class KnowledgeBaseService(object):
             logger.error(f"文件读取失败: {str(e)}")
             return f'[失败]文件读取失败: {str(e)}'
 
-    def delete_file(self, filename: str):
+    def soft_delete_file(self, filename: str):
         """
-        从知识库中删除指定文件的所有向量数据
+        软删除：移入回收站（打不可用标签，物理数据不动，检索/模型读取全流程屏蔽）
+        """
+        return soft_delete_file_to_recycle(self.chroma, filename)
+
+    def list_files(self) -> list:
+        """
+        已上传文件列表（数据源为向量库存活分块聚合，排除回收站文件）
+        """
+        return list_alive_files_from_store(self.chroma)
+
+    def restore_file(self, filename: str):
+        """
+        从回收站恢复文件（去除不可用标签，写回 md5 与文献记录）
+        """
+        return restore_file_from_recycle(self.chroma, filename)
+
+    def list_recycle_bin(self) -> list:
+        """
+        回收站文件列表（含删除时间、分块数、原文献标题）
+        """
+        records = load_recycle_bin()
+        items = [
+            {
+                'filename': filename,
+                'title': info.get('title', ''),
+                'deleted_time': info.get('deleted_time', ''),
+                'chunks': info.get('chunks', 0),
+            }
+            for filename, info in records.items()
+        ]
+        items.sort(key=lambda x: x['deleted_time'], reverse=True)
+        return items
+
+    def purge_file(self, filename: str):
+        """
+        彻底删除（回收站清理）：物理删除向量分块，并清理 md5 / 文献 / 回收站记录
         """
         try:
-            results = self.chroma.get(
-                where={"source": filename},
-                include=[]
-            )
-            
-            ids_to_delete = results['ids']
-            
-            if ids_to_delete:
-                self.chroma.delete(ids_to_delete)
-                logger.info(f"成功删除 {len(ids_to_delete)} 个向量，来源: {filename}")
-                
-                with md5_lock:
-                    if MD5_FILE_PATH.exists():
-                        with open(MD5_FILE_PATH, 'r', encoding='utf-8') as f:
-                            lines = f.readlines()
-                        
-                        new_lines = [line for line in lines if filename not in line]
-                        
-                        with open(MD5_FILE_PATH, 'w', encoding='utf-8') as f:
-                            f.writelines(new_lines)
-                
-                remove_literature_item(filename)
-                
-                return f'[成功]已从知识库中删除文件: {filename}'
-            else:
-                logger.info(f"未找到文件 {filename} 的向量数据")
-                return f'[提示]未找到文件 {filename} 的数据'
+            removed = _purge_file_from_vector_store(self.chroma, filename)
+
+            # 清理回收站记录（软删除场景）
+            records = load_recycle_bin()
+            if filename in records:
+                records.pop(filename, None)
+                _save_recycle_bin(records)
+
+            # 清理 md5 与文献记录（兜底：文件可能是绕过回收站直接彻底删除的）
+            _remove_md5_record(filename)
+            remove_literature_item(filename)
+
+            if removed:
+                return f'[成功]已彻底删除文件: {filename}'
+            return f'[提示]未找到文件 {filename} 的向量数据，已清理相关记录'
         except Exception as e:
-            logger.error(f"删除文件失败: {str(e)}")
-            return f'[失败]删除文件失败: {str(e)}'
+            logger.error(f"彻底删除失败: {filename}, {str(e)}")
+            return f'[失败]彻底删除失败: {str(e)}'
+
+    def delete_file(self, filename: str):
+        """
+        从知识库中彻底删除指定文件的所有向量数据（物理删除）
+        注意：管理端常规"删除"请使用 soft_delete_file（移入回收站）
+        """
+        return self.purge_file(filename)
+
+    def clean_expired_recycle(self) -> list:
+        """
+        清理回收站中超过保留期的文件（供定期自动清理任务调用）
+        保留期由 config.RECYCLE_RETENTION_DAYS 配置，<=0 表示不启用
+        """
+        return clean_expired_recycle(self.chroma, config.RECYCLE_RETENTION_DAYS)
 
 
 if __name__ == '__main__':

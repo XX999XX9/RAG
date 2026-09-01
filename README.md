@@ -14,6 +14,7 @@
 - [配置说明](#配置说明)
 - [使用示例](#使用示例)
 - [扩展开发](#扩展开发)
+- [安全说明](#安全说明)
 
 ---
 
@@ -156,9 +157,17 @@
 
 | 属性 | 值 |
 |------|------|
-| 基础 URL | `http://localhost:8989` |
-| API 文档 | `http://localhost:8989/docs` |
-| 聊天界面 | `http://localhost:8989/chat` |
+| 基础 URL | `http://localhost:8000` |
+| API 文档 | `http://localhost:8000/docs` |
+| 用户聊天界面 | `http://localhost:8000/chat` |
+| 管理员控制台 | `http://localhost:8000/admin` |
+
+### 页面说明
+
+| 页面 | 说明 |
+|------|------|
+| `/chat` 用户页 | 仅对话问答；文件管理已移除，由管理员在 `/admin` 维护 |
+| `/admin` 管理员页 | ① **会话记录**：查看所有用户会话的完整聊天记录，每条 AI 回复末尾以可点击序号展示本次回复的检索参考资料，点击后查看原文与元数据；② **知识库文档**：按来源浏览向量库实存数据，分页查看每个分块的内容与元数据；③ **知识库管理**：上传文件；删除采用回收站机制——移入回收站的文件在检索与模型读取全流程中不可见，可随时恢复或彻底删除 |
 
 ### 接口列表
 
@@ -166,20 +175,29 @@
 |------|------|------|
 | `/api/chat` | POST | 对话问答（HTTP） |
 | `/api/chat/ws` | WebSocket | 流式对话 |
-| `/api/upload` | POST | 上传文件到知识库 |
-| `/api/files` | GET | 获取已上传文件列表 |
-| `/api/files/{filename}` | DELETE | 删除指定文件 |
+| `/api/upload` | POST | 上传文件到知识库（管理员） |
+| `/api/files` | GET | 获取已上传文件列表（管理员） |
+| `/api/files/{filename}` | DELETE | 删除文件（管理员，软删除：移入回收站） |
+| `/api/literature` | GET | 获取文献列表 |
+| `/api/admin/documents` | GET | 知识库文档列表（按来源聚合，含分块数量，管理员；`?include_deleted=true` 含回收站分块统计） |
+| `/api/admin/documents/{filename}/chunks` | GET | 分页浏览文档分块与元数据（管理员，`?page=1&page_size=20&include_deleted=false`） |
+| `/api/admin/sessions` | GET | 用户会话列表（含消息数、最后活跃时间，管理员） |
+| `/api/admin/sessions/{session_id}` | GET | 指定会话的完整聊天记录（管理员） |
+| `/api/admin/sessions/{session_id}/retrievals` | GET | 指定会话的检索审计记录：每次模型回复引用的分块原文+元数据，按回复顺序排列（管理员） |
+| `/api/admin/recycle` | GET | 回收站文件列表（管理员） |
+| `/api/admin/recycle/{filename}/restore` | POST | 从回收站恢复文件（管理员） |
+| `/api/admin/recycle/{filename}` | DELETE | 彻底删除回收站文件（管理员，物理删除不可恢复） |
 | `/health` | GET | 健康检查 |
 
 ### 接口详情
 
 #### POST /api/chat
 
-请求体：
+请求体（`session_id` 可选，传入后可续接多轮对话；不传则服务端新建会话并在响应中返回）：
 ```json
 {
     "message": "什么是认知心理学？",
-    "history": []
+    "session_id": "chat-1756627200000-abc123"
 }
 ```
 
@@ -187,7 +205,8 @@
 ```json
 {
     "success": true,
-    "response": "认知心理学是研究人类认知过程的科学..."
+    "response": "认知心理学是研究人类认知过程的科学...",
+    "session_id": "chat-1756627200000-abc123"
 }
 ```
 
@@ -220,6 +239,16 @@ BAILIAN_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
 
 # 阿里云DashScope API
 DASHSCOPE_API_KEY=your_dashscope_api_key
+
+# 可选：API Key 鉴权（设置后所有 /api/* 接口需要携带 X-API-Key 请求头）
+# RAG_API_KEY=your_service_api_key
+
+# 可选：管理员密钥（设置后 /api/admin/* 与管理员页面接口需要携带；
+# 未设置时复用 RAG_API_KEY，两者都未设置时管理员接口在本地开放）
+# ADMIN_API_KEY=your_admin_api_key
+
+# 可选：每 IP 每分钟对聊天/上传接口的限流阈值（默认 30）
+# RATE_LIMIT_PER_MINUTE=30
 ```
 
 ### 2. 安装依赖
@@ -230,14 +259,17 @@ pip install -r requirements.txt
 
 ### 3. 启动服务
 
-**启动 FastAPI 服务**：
+**启动 FastAPI 服务**（端口固定为 8000，由 `config_data.py` 的 `SERVER_PORT` 决定）：
 ```bash
-uvicorn backend.main:app --host 0.0.0.0 --port 8989 --reload
+python backend/main.py
+# 或：uvicorn backend.main:app --host 0.0.0.0 --port 8000
 ```
 
 **访问地址**：
-- API 文档：http://localhost:8989/docs
-- 聊天界面：http://localhost:8989/chat
+- API 文档：http://localhost:8000/docs
+- 聊天界面：http://localhost:8000/chat
+
+> 注意：前端页面的 JS 依赖（marked / DOMPurify）由后端 `/static` 提供，请通过 `http://localhost:8000/chat` 访问，不要直接以文件方式打开 index.html。
 
 ---
 
@@ -246,6 +278,9 @@ uvicorn backend.main:app --host 0.0.0.0 --port 8989 --reload
 ### 核心配置项（config_data.py）
 
 ```python
+# 服务端口
+SERVER_PORT = 8000
+
 # 文件解析
 SUPPORTED_FILE_TYPES = ['txt', 'pdf', 'docx', 'md']
 MAX_FILE_SIZE_MB = 200
@@ -260,19 +295,24 @@ KEYWORD_WEIGHT = 0.3  # 关键词权重
 SEMANTIC_WEIGHT = 0.7  # 语义权重
 
 # 邻近 Chunk 扩展
-NEIGHBOR_EXPAND_TOP_N = 2  # 对检索结果中前 N 个进行邻近 chunk 扩展
+USE_LLM_CHUNK_EXPANSION = True  # 启用 LLM 驱动的邻近 chunk 扩展
 
-# 文献识别
-LITERATURE_LIST_PATH = './literature_list.json'  # 文献列表存储路径
-REFERENCE_KEYWORDS = ['参考', '依据', '引用', '根据', '出自', '来源', '按照', '参见']
+# 会话历史
+MAX_HISTORY_MESSAGES = 20  # 送入模型的最大历史消息条数
+
+# 回收站（软删除）
+RECYCLE_RETENTION_DAYS = 0  # 回收站文件保留天数，超过后自动彻底删除；0 表示不启用自动清理
+
+# 文献识别（注意：不包含"根据""按照"等高频词，避免误触发分源检索）
+REFERENCE_KEYWORDS = ['参考', '依据', '引用', '出自', '来源', '参见']
 
 # 模型配置
 chat_model_name = 'deepseek-v4-pro'  # 基座模型（通过百炼平台接入）
 embedding_model_name = 'text-embedding-v4'  # 嵌入模型
 
 # Ollama重排序
-USE_OLLAMA_RERANKER = False  # 启用本地重排序
-OLLAMA_RERANKER_MODEL = 'B-A-M-N/qwen3-reranker-0.6b-fp16:latest'
+USE_OLLAMA_RERANKER = True  # 启用本地重排序
+OLLAMA_RERANKER_MODEL = 'bbjson/bge-reranker-base:latest'
 ```
 
 ### 启用 Ollama 重排序
@@ -284,7 +324,7 @@ ollama serve
 
 2. 拉取模型：
 ```bash
-ollama pull B-A-M-N/qwen3-reranker-0.6b-fp16:latest
+ollama pull bbjson/bge-reranker-base:latest
 ```
 
 3. 修改配置：
@@ -299,14 +339,14 @@ USE_OLLAMA_RERANKER = True
 ### 示例1：通过 API 上传文档
 
 ```bash
-curl -X POST http://localhost:8989/api/upload \
+curl -X POST http://localhost:8000/api/upload \
   -F "file=@心理学导论.txt"
 ```
 
 ### 示例2：通过 API 提问
 
 ```bash
-curl -X POST http://localhost:8989/api/chat \
+curl -X POST http://localhost:8000/api/chat \
   -H "Content-Type: application/json" \
   -d '{"message": "什么是认知心理学？"}'
 ```
@@ -336,14 +376,15 @@ for chunk in response:
 
 ### 添加新的文件类型支持
 
-在 `knowledge_base.py` 的 `parse_file` 函数中添加：
+在 `knowledge_base.py` 的 `upload_by_file` 函数中添加对应的读取分支：
 
 ```python
-def parse_file(file_obj, file_type: str) -> str:
-    if file_type == 'new_type':
-        # 添加新文件类型的解析逻辑
-        pass
+elif file_ext == 'new_type':
+    with open(file_path, 'r', encoding='utf-8') as f:
+        data = f.read()
 ```
+
+同时在 `config_data.py` 的 `SUPPORTED_FILE_TYPES` 中登记新扩展名。
 
 ### 自定义章节标题模式
 
@@ -374,19 +415,25 @@ async def custom_endpoint():
 ```
 RAG/
 ├── backend/
-│   └── main.py             # FastAPI 后端服务
+│   └── main.py             # FastAPI 后端服务（含 /api/admin 管理员接口）
 ├── frontend/
-│   └── index.html          # 前端界面（黑白简约风格）
-├── rag.py                  # RAG核心服务
+│   ├── index.html          # 用户页（仅对话）
+│   ├── admin.html          # 管理员控制台（会话审计 / 文档浏览 / 知识库管理）
+│   ├── marked.min.js       # Markdown 渲染库（本地化）
+│   └── purify.min.js       # DOMPurify 消毒库（本地化，防 XSS）
+├── rag.py                  # RAG核心服务（含检索审计记录落盘）
 ├── knowledge_base.py       # 知识库管理
-├── vector_stores.py        # 向量存储服务
+├── vector_stores.py        # 向量存储服务（含文档浏览方法）
+├── file_history_store.py   # 会话历史存储
 ├── chapter_splitter.py     # 章节分割器
 ├── ollama_reranker.py      # Ollama重排序器
 ├── config_data.py          # 配置文件
 ├── requirements.txt        # Python依赖
+├── 修复报告.md             # 问题修复报告
 ├── literature_list.json    # 文献列表
 ├── chroma_db/              # 向量数据库
 ├── chat_history/           # 会话历史
+├── retrieval_history/      # 检索审计记录（管理员页面数据源）
 └── .env                    # 环境变量
 ```
 
@@ -396,15 +443,30 @@ RAG/
 
 1. **数据持久化**：向量数据存储在 `./chroma_db/`，会话历史存储在 `./chat_history/`，文献列表存储在 `./literature_list.json`
 2. **去重机制**：使用 MD5 校验避免重复入库
-3. **章节信息**：章节标题、编号等元数据会保存到向量库
-4. **流式响应**：通过 WebSocket 实现打字机效果
-5. **模型分配**：
+3. **回收站机制（软删除）**：删除文件时向量数据物理保留，仅在元数据打 `deleted='true'` 不可用标签，检索（语义/关键词/指定文献/邻近 chunk 扩展）与模型读取全流程通过存活过滤器自动屏蔽；可从回收站一键恢复（写回 MD5 与文献记录），或彻底删除（物理清除）。设置 `RECYCLE_RETENTION_DAYS > 0` 后服务每小时自动清理超期文件
+4. **章节信息**：章节标题、编号等元数据会保存到向量库
+5. **流式响应**：通过 WebSocket 实现打字机效果
+6. **模型分配**：
    - 知识入库：云端 DashScope Embeddings
    - 检索：云端 DashScope
    - 重排序：可选本地 Ollama
    - 聊天：云端 ChatOpenAI (DeepSeek V4 Pro)
-6. **邻近 Chunk 扩展**：检索时自动补充排名靠前结果的物理相邻文本块，连续 chunk 会被合并为完整文档，确保模型获得完整的上下文
-7. **分源检索**：当用户使用"参考""依据"等词汇时，一半检索从指定文献中获取，另一半从全局检索，回复时分开展示
+7. **邻近 Chunk 扩展**：检索时自动补充排名靠前结果的物理相邻文本块，连续 chunk 会被合并为完整文档，确保模型获得完整的上下文
+8. **分源检索**：当用户使用"参考""依据"等词汇时，一半检索从指定文献中获取，另一半从全局检索，回复时分开展示
+9. **多轮对话**：前端为每个对话维护 `sessionId` 并随消息发送，服务端按会话文件持久化历史（截断保留最近 `MAX_HISTORY_MESSAGES` 条）
+
+---
+
+## 🔒 安全说明
+
+- **CORS**：默认仅允许 `http://localhost:8000` / `http://127.0.0.1:8000`
+- **API Key（可选）**：在 `.env` 中设置 `RAG_API_KEY` 后，所有 `/api/*` 接口要求 `X-API-Key` 请求头；网页端可通过 `http://localhost:8000/chat?key=xxx` 首次注入并自动缓存
+- **限流**：`/api/chat`、`/api/upload` 默认每 IP 每分钟 30 次（`RATE_LIMIT_PER_MINUTE` 可调）
+- **XSS 防护**：AI 回复经 DOMPurify 消毒后渲染；文件名等动态内容统一 HTML 转义
+- **会话安全**：`session_id` 仅允许字母/数字/下划线/连字符（≤64 位），防止路径遍历
+- **公网部署建议**：前置 nginx 启用 TLS，并务必设置 `RAG_API_KEY`
+
+> 历史遗留问题的完整修复记录见 [修复报告.md](修复报告.md)。
 
 ---
 

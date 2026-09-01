@@ -8,6 +8,9 @@ chroma_db/
 # Chat history
 chat_history/
 
+# Retrieval audit history（管理员检索审计记录）
+retrieval_history/
+
 # Environment
 .env
 
@@ -16,3 +19,5 @@ PROJECT_DOCUMENTATION.md
 
 #本地已经上传文档
 md5.txt
+recycle_bin.json
+修复报告.md

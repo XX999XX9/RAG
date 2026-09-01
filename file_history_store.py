@@ -10,9 +10,22 @@ logger = logging.getLogger(__name__)
 
 from typing import Sequence
 import os
+import re
 import json
+from pathlib import Path
 from langchain_core.messages import message_to_dict, messages_from_dict, BaseMessage
 from langchain_core.chat_history import  BaseChatMessageHistory
+
+# 会话历史存储目录（基于本文件位置的绝对路径，避免受启动目录影响）
+HISTORY_BASE_DIR = Path(__file__).parent / 'chat_history'
+
+# session_id 只允许字母/数字/下划线/连字符，防止路径遍历攻击（如 ../../.env）
+SESSION_ID_PATTERN = re.compile(r'^[A-Za-z0-9_-]{1,64}$')
+
+
+def is_valid_session_id(session_id) -> bool:
+    """校验 session_id 是否为安全的文件名组成部分"""
+    return bool(session_id) and bool(SESSION_ID_PATTERN.match(str(session_id)))
 
 class FileChatMessageHistory(BaseChatMessageHistory):
     def __init__(self,session_id,storage_path):
@@ -74,7 +87,10 @@ class FileChatMessageHistory(BaseChatMessageHistory):
             logger.error(f"会话历史清空失败: {str(e)}")
 
 
-#通过会话id获取InMemoryChatMessageHistory
+#通过会话id获取会话历史
 def get_history(session_id):
+    # 安全校验：拒绝包含路径分隔符等危险字符的 session_id，防止路径遍历
+    if not is_valid_session_id(session_id):
+        raise ValueError(f"非法的 session_id: {session_id!r}")
     logger.info(f"获取会话历史: session_id={session_id}")
-    return FileChatMessageHistory(session_id,'./chat_history')
+    return FileChatMessageHistory(session_id, str(HISTORY_BASE_DIR))
